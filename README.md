@@ -35,15 +35,25 @@ cd Backend-DinoChomp
 
 ## 🧰 Compilar y ejecutar
 
-Para compilar el proyecto:
+1. Para compilar el proyecto:
 ```bash
-mvn clean install
+mvn clean package
 ```
-
-Para ejecutar la aplicación:
+2. Para ejecutar la aplicación en local:
 ```bash
 mvn spring-boot:run
 ```
+3. Este proyecto usa contenedores docker, para contruirlos y ejecutarlos en segundo plano:
+```bash
+docker compose up --build -d
+```
+4. Ingresa a: 
+```
+http://localhost:8080/
+```
+
+Cuando realizes cambios (NO a `docker-compose.yml` ni la configuración 
+de la base de datos) ejecuta nuevamente el paso 1 y 3.
 ## 🧪 Pruebas
 
 Ejecuta las pruebas unitarias con:

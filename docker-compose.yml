@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: backend-dinochomp
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/dinochompdb
+      SPRING_DATASOURCE_USERNAME: dino
+      SPRING_DATASOURCE_PASSWORD: chomp
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    container_name: postgres-dinochomp
+    restart: always
+    environment:
+      POSTGRES_DB: dinochompdb
+      POSTGRES_USER: dino
+      POSTGRES_PASSWORD: chomp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

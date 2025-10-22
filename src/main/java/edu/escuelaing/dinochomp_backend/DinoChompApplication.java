@@ -10,4 +10,3 @@ public class DinoChompApplication {
         SpringApplication.run(DinoChompApplication.class, args);
     }
 }
-
