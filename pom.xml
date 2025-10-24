@@ -6,11 +6,12 @@
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- Hereda de Spring Boot -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.4.3</version>
-        <relativePath/> <!-- Busca el parent en el repositorio de Maven -->
+        <relativePath/>
     </parent>
 
     <groupId>edu.escuelaing.dinochomp_backend</groupId>
