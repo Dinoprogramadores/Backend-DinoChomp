@@ -7,26 +7,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/dinochompdb
-      SPRING_DATA_MONGODB_DATABASE: dinochompdb
-    depends_on:
-      - mongo
+      - SPRING_DATA_MONGODB_URI=${MONGODB_URI}
+      - SPRING_DATA_MONGODB_DATABASE=dinochomp
     networks:
       - dinochomp-net
-
-  mongo:
-    image: mongo:7.0
-    container_name: mongo-dinochomp
-    restart: always
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodata:/data/db
-    networks:
-      - dinochomp-net
-
-volumes:
-  mongodata:
+    env_file:
+      - .env
 
 networks:
   dinochomp-net:
