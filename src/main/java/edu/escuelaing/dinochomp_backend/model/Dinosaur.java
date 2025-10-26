@@ -1,18 +1,22 @@
 package edu.escuelaing.dinochomp_backend.model;
 
+import org.springframework.data.mongodb.core.mapping.*;
+import jakarta.persistence.Id;
 import lombok.*;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+
 
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Builder
 @Document(collection = "Dinosaur")
 public class Dinosaur {
     @Id
     private String id;
     private String species;
-    private int size;
+
+    private String name;
+    private int damage;
+    
 }
