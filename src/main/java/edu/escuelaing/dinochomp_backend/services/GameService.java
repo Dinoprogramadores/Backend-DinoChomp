@@ -2,13 +2,16 @@ package edu.escuelaing.dinochomp_backend.services;
 
 import edu.escuelaing.dinochomp_backend.model.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.Game;
+import edu.escuelaing.dinochomp_backend.model.Player;
 import edu.escuelaing.dinochomp_backend.repository.GameRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class GameService {
@@ -16,6 +19,42 @@ public class GameService {
     @Autowired
     private GameRepository gameRepository;
 
+    private final Map<String, Player> players = new ConcurrentHashMap<>();
+    
+    public Player addPlayer(String id) {
+        Player player = new Player();
+        players.put(id, player);
+        return player;
+    }
+    
+    public Player movePlayer(String id, String direction) {
+        Player player = players.get(id);
+        if (player != null && player.isAlive()) {
+            synchronized (player) {
+                player.move(direction);
+            }
+        }
+        return player;
+    }
+
+        public void reduceHealthOverTime() {
+            for (Player player : players.values()) {
+                if (player.isAlive()) {
+                    player.setHealth(player.getHealth() - 5);
+                    if (player.getHealth() <= 0) {
+                        player.setAlive(false);
+                    }
+                }
+            }
+        
+    }
+    
+    public void decreaseHealthForAll() {
+        for (Player p : players.values()) {
+            p.loseHealth(1);
+        }
+    }
+    
     public Game createGame(Game game) {
         // nombre es el id
         return gameRepository.save(game);

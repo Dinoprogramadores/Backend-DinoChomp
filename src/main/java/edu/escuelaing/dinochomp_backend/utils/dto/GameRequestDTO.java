@@ -15,7 +15,7 @@ public class GameRequestDTO {
     private String nombre;
     private boolean isActive;
     // key = playerId (String) -> DinosaurDTO
-    private Map<String, DinosaurDTO> playerDinosaurMap;
+    private Map<String, DinosaurRequestDTO> playerDinosaurMap;
     private Set<Power> powers;
     private Map<String, Object> metadata;
     private int durationMinutes;

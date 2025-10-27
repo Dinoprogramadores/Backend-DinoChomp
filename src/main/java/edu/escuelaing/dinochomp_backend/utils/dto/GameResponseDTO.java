@@ -27,7 +27,7 @@ public class GameResponseDTO {
     /**
      * Mapa de dinosaurios de los jugadores.
      */
-    private Map<String, DinosaurDTO> playerDinosaurMap;
+    private Map<String, DinosaurRequestDTO> playerDinosaurMap;
     /**
      * Conjunto de poderes disponibles en el juego.
      */

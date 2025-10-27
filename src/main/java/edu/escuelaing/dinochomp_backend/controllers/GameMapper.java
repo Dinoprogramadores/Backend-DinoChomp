@@ -1,5 +1,4 @@
-package edu.escuelaing.dinochomp_backend.utils.mappers;
-
+package edu.escuelaing.dinochomp_backend.controllers;
 import edu.escuelaing.dinochomp_backend.model.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.Game;
 import edu.escuelaing.dinochomp_backend.utils.dto.DinosaurRequestDTO;
@@ -69,4 +68,5 @@ public class GameMapper {
                 .build();
     }
 }
+
 

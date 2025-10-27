@@ -22,7 +22,7 @@ public class Player {
     private String password;
     private int positionX;
     private int positionY;
-    private int health = 100;
+    private int health;
     private boolean isAlive;
 
     public void move(String direction) {

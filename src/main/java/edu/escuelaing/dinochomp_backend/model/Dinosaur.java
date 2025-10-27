@@ -14,8 +14,6 @@ import lombok.*;
 public class Dinosaur {
     @Id
     private String id;
-    private String species;
-
     private String name;
     private int damage;
     

@@ -2,7 +2,7 @@ package edu.escuelaing.dinochomp_backend.controllers;
 
 import edu.escuelaing.dinochomp_backend.model.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.Game;
-import edu.escuelaing.dinochomp_backend.utils.dto.DinosaurDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.DinosaurRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.GameRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.GameResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.GameMapper;
@@ -65,7 +65,7 @@ public class GameController {
     }
 
     @PostMapping("/{id}/players/{playerId}")
-    public ResponseEntity<GameResponseDTO> addPlayerDinosaur(@PathVariable String id, @PathVariable String playerId, @RequestBody DinosaurDTO dinosaurDTO) {
+    public ResponseEntity<GameResponseDTO> addPlayerDinosaur(@PathVariable String id, @PathVariable String playerId, @RequestBody DinosaurRequestDTO dinosaurDTO) {
         Dinosaur d = gameMapper.toEntity(dinosaurDTO);
         return gameService.addPlayerDinosaur(id, playerId, d)
                 .map(g -> ResponseEntity.ok(gameMapper.toDTO(g)))
