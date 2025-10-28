@@ -44,5 +44,11 @@ public class Player {
         }
     }
 
+    public void addHealth(int amount) {
+        if (isAlive) {
+            health += amount;
+        }
+    }
+
 }
 

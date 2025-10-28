@@ -4,7 +4,7 @@ import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.game.Game;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.repository.GameRepository;
-import edu.escuelaing.dinochomp_backend.utils.dto.PlayerPositionDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
