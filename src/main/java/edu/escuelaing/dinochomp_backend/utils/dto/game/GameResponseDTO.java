@@ -1,5 +1,6 @@
-package edu.escuelaing.dinochomp_backend.utils.dto;
+package edu.escuelaing.dinochomp_backend.utils.dto.game;
 
+import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.enums.Power;
 import lombok.*;
 

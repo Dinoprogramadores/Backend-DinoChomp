@@ -1,4 +1,4 @@
-package edu.escuelaing.dinochomp_backend.model;
+package edu.escuelaing.dinochomp_backend.model.food;
 
 import org.springframework.data.mongodb.core.mapping.Document;
 

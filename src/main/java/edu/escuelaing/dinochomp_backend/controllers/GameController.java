@@ -1,10 +1,10 @@
 package edu.escuelaing.dinochomp_backend.controllers;
 
-import edu.escuelaing.dinochomp_backend.model.Dinosaur;
-import edu.escuelaing.dinochomp_backend.model.Game;
-import edu.escuelaing.dinochomp_backend.utils.dto.DinosaurRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.GameRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.GameResponseDTO;
+import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
+import edu.escuelaing.dinochomp_backend.model.game.Game;
+import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.game.GameRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.game.GameResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.GameMapper;
 import edu.escuelaing.dinochomp_backend.services.GameService;
 import org.springframework.beans.factory.annotation.Autowired;

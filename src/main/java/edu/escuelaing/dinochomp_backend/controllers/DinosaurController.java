@@ -1,9 +1,9 @@
 package edu.escuelaing.dinochomp_backend.controllers;
 
-import edu.escuelaing.dinochomp_backend.model.Dinosaur;
+import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.services.DinosaurService;
-import edu.escuelaing.dinochomp_backend.utils.dto.DinosaurRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.DinosaurResponseDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.DinosaurMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

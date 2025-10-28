@@ -1,9 +1,9 @@
 package edu.escuelaing.dinochomp_backend.controllers;
 
-import edu.escuelaing.dinochomp_backend.model.Food;
+import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.services.FoodService;
-import edu.escuelaing.dinochomp_backend.utils.dto.FoodRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.FoodResponseDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.food.FoodRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.food.FoodResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.FoodMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

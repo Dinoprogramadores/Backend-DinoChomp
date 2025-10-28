@@ -1,5 +1,6 @@
-package edu.escuelaing.dinochomp_backend.model;
+package edu.escuelaing.dinochomp_backend.model.game;
 
+import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.utils.enums.Power;
 import lombok.*;
 import org.springframework.data.annotation.Id;

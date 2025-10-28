@@ -1,9 +1,9 @@
 package edu.escuelaing.dinochomp_backend.controllers;
 
-import edu.escuelaing.dinochomp_backend.model.Power;
+import edu.escuelaing.dinochomp_backend.model.power.Power;
 import edu.escuelaing.dinochomp_backend.services.PowerService;
-import edu.escuelaing.dinochomp_backend.utils.dto.PowerRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.PowerResponseDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.PowerMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

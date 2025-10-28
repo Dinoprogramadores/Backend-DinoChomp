@@ -1,18 +1,21 @@
-package edu.escuelaing.dinochomp_backend.utils.dto;
-import lombok.AllArgsConstructor;
+package edu.escuelaing.dinochomp_backend.utils.dto.player;
+
+import java.io.Serializable;
+
+import lombok.Getter;
 import lombok.*;
+import lombok.Setter;
 
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class PlayerResponseDTO {
+public class PlayerPositionDTO implements Serializable {
     private String id;
-    private String name;
-    private String password;
     private int positionX;
     private int positionY;
     private int health;
     private boolean isAlive;
+
 }

@@ -1,5 +1,6 @@
-package edu.escuelaing.dinochomp_backend.model;
+package edu.escuelaing.dinochomp_backend.model.power;
 
+import edu.escuelaing.dinochomp_backend.model.game.Player;
 import org.springframework.data.mongodb.core.mapping.Document;
 import lombok.*;
 
@@ -9,7 +10,7 @@ import lombok.*;
 @NoArgsConstructor
 @Builder
 @Document(collection = "Dinosaur")
-public class HealthPower extends Power{
+public class HealthPower extends Power {
     private int addedHealth;
 
     @Override

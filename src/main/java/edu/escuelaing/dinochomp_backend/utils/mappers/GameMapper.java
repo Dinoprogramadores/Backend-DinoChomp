@@ -1,10 +1,10 @@
 package edu.escuelaing.dinochomp_backend.utils.mappers;
 
-import edu.escuelaing.dinochomp_backend.model.Dinosaur;
-import edu.escuelaing.dinochomp_backend.model.Game;
-import edu.escuelaing.dinochomp_backend.utils.dto.DinosaurRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.GameRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.GameResponseDTO;
+import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
+import edu.escuelaing.dinochomp_backend.model.game.Game;
+import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.game.GameRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.game.GameResponseDTO;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;

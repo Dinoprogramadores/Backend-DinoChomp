@@ -1,9 +1,9 @@
 package edu.escuelaing.dinochomp_backend.utils.mappers;
 
-import edu.escuelaing.dinochomp_backend.model.Dinosaur;
-import edu.escuelaing.dinochomp_backend.model.Player;
-import edu.escuelaing.dinochomp_backend.utils.dto.PlayerRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.PlayerResponseDTO;
+import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
+import edu.escuelaing.dinochomp_backend.model.game.Player;
+import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerResponseDTO;
 
 import org.springframework.stereotype.Component;
 

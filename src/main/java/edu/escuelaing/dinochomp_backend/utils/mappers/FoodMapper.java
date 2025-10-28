@@ -1,8 +1,8 @@
 package edu.escuelaing.dinochomp_backend.utils.mappers;
 
-import edu.escuelaing.dinochomp_backend.model.Food;
-import edu.escuelaing.dinochomp_backend.utils.dto.FoodRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.FoodResponseDTO;
+import edu.escuelaing.dinochomp_backend.model.food.Food;
+import edu.escuelaing.dinochomp_backend.utils.dto.food.FoodRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.food.FoodResponseDTO;
 
 import org.springframework.stereotype.Component;
 

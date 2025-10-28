@@ -1,8 +1,8 @@
 package edu.escuelaing.dinochomp_backend.services;
 
-import edu.escuelaing.dinochomp_backend.model.Dinosaur;
-import edu.escuelaing.dinochomp_backend.model.Game;
-import edu.escuelaing.dinochomp_backend.model.Player;
+import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
+import edu.escuelaing.dinochomp_backend.model.game.Game;
+import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.repository.GameRepository;
 import edu.escuelaing.dinochomp_backend.utils.dto.PlayerPositionDTO;
 

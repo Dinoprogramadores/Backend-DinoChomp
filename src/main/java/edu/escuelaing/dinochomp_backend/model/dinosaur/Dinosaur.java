@@ -1,4 +1,4 @@
-package edu.escuelaing.dinochomp_backend.model;
+package edu.escuelaing.dinochomp_backend.model.dinosaur;
 
 import org.springframework.data.mongodb.core.mapping.*;
 import jakarta.persistence.Id;

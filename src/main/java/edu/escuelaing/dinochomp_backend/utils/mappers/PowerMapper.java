@@ -1,9 +1,9 @@
 package edu.escuelaing.dinochomp_backend.utils.mappers;
 
-import edu.escuelaing.dinochomp_backend.model.HealthPower;
-import edu.escuelaing.dinochomp_backend.model.Power;
-import edu.escuelaing.dinochomp_backend.utils.dto.PowerRequestDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.PowerResponseDTO;
+import edu.escuelaing.dinochomp_backend.model.power.HealthPower;
+import edu.escuelaing.dinochomp_backend.model.power.Power;
+import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerResponseDTO;
 
 import org.springframework.stereotype.Component;
 

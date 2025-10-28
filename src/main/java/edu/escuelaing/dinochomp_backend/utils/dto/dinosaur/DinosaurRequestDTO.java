@@ -1,4 +1,4 @@
-package edu.escuelaing.dinochomp_backend.utils.dto;
+package edu.escuelaing.dinochomp_backend.utils.dto.dinosaur;
 
 import lombok.*;
 
