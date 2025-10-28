@@ -16,13 +16,15 @@ import java.util.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "Boards")
+@Getter
+@Setter
 public class Board implements Serializable {
 
     @Id
     private String id;
     private int width;
     private int height;
-    private Map<Point, Object> map;
+    private Map<Point, BoardItem> map;
     private boolean isComplete = false;
 
     public Board(int width, int height) {
@@ -41,7 +43,7 @@ public class Board implements Serializable {
         return map.get(p);
     }
 
-    public void setItem(Point p, Object obj) {
+    public void setItem(Point p, BoardItem obj) {
         if (insideBoard(p)) {
             map.put(p, obj);
         }

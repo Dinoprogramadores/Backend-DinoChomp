@@ -1,5 +1,6 @@
 package edu.escuelaing.dinochomp_backend.model.game;
 
+import edu.escuelaing.dinochomp_backend.model.board.BoardItem;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.annotation.Id;
 
@@ -15,7 +16,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 @Document(collection = "Player")
-public class Player {
+public class Player extends BoardItem {
     @Id
     private String id;
     private String name;
