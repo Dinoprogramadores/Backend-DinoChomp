@@ -2,7 +2,7 @@ package edu.escuelaing.dinochomp_backend.model.board;
 
 import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
-import jakarta.persistence.Id;
+import org.springframework.data.annotation.Id;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -97,17 +97,5 @@ public class Board implements Serializable {
         }
     }
 
-    public void imprimir() {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                Object o = map.get(new Point(x, y));
-                if (o == null) System.out.print(".");
-                else if (o instanceof Player) System.out.print("P");
-                else if (o instanceof Food) System.out.print("F");
-                else System.out.print("?");
-            }
-            System.out.println();
-        }
-    }
 }
 

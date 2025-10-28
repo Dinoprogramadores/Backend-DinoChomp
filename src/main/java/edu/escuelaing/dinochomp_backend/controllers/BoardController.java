@@ -10,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/boards")
+@RequestMapping("/boards")
 @RequiredArgsConstructor
 public class BoardController {
 
@@ -57,11 +57,5 @@ public class BoardController {
         player.setId(dto.getPlayerId());
         Board updated = boardService.movePlayer(boardId, player, dto.getNewX(), dto.getNewY());
         return ResponseEntity.ok(updated);
-    }
-
-    @GetMapping("/{boardId}/print")
-    public ResponseEntity<Void> printBoard(@PathVariable String boardId) {
-        boardService.printBoard(boardId);
-        return ResponseEntity.ok().build();
     }
 }

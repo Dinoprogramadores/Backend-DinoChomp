@@ -1,18 +1,18 @@
 package edu.escuelaing.dinochomp_backend.services;
 
 import edu.escuelaing.dinochomp_backend.model.board.Board;
+import edu.escuelaing.dinochomp_backend.model.board.BoardDocument;
 import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.repository.BoardRepository;
+import edu.escuelaing.dinochomp_backend.utils.mappers.BoardMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.awt.Point;
 import java.util.Optional;
 
 @Service
-@Slf4j
 @RequiredArgsConstructor
 public class BoardService {
 
@@ -20,45 +20,64 @@ public class BoardService {
 
     public Board createBoard(int width, int height) {
         Board board = new Board(width, height);
-        return boardRepository.save(board);
+
+        BoardDocument document = BoardMapper.toDocument(board);
+        document = boardRepository.save(document);
+
+        return BoardMapper.fromDocument(document);
     }
 
-    public Optional<Board> getBoard(String id) {
-        return boardRepository.findById(id);
+    public Optional<Board> getBoard(String boardId) {
+        return boardRepository.findById(boardId)
+                .map(BoardMapper::fromDocument);
     }
 
     public Board addPlayer(String boardId, Player player) {
-        Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalStateException("Board not found: " + boardId));
+        Board board = getBoard(boardId)
+                .orElseThrow(() -> new RuntimeException("Board not found"));
 
-        board.addPlayer(player);
-        return boardRepository.save(board);
+        Point position = new Point(player.getPositionX(), player.getPositionY());
+        board.getMap().put(position, player);
+
+        BoardDocument doc = BoardMapper.toDocument(board);
+        boardRepository.save(doc);
+
+        return board;
     }
 
     public Board addFood(String boardId, Food food) {
-        Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalStateException("Board not found: " + boardId));
+        Board board = getBoard(boardId)
+                .orElseThrow(() -> new RuntimeException("Board not found"));
 
-        board.addFood(food);
-        return boardRepository.save(board);
+        Point position = new Point(food.getPositionX(), food.getPositionY());
+        board.getMap().put(position, food);
+
+        BoardDocument doc = BoardMapper.toDocument(board);
+        boardRepository.save(doc);
+
+        return board;
     }
 
     public Board movePlayer(String boardId, Player player, int newX, int newY) {
-        Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalStateException("Board not found: " + boardId));
+        Board board = getBoard(boardId)
+                .orElseThrow(() -> new RuntimeException("Board not found"));
 
-        board.movePlayer(player, newX, newY);
-        return boardRepository.save(board);
-    }
+        Point currentPos = board.getMap().entrySet().stream()
+                .filter(e -> e.getValue() instanceof Player
+                        && ((Player) e.getValue()).getId().equals(player.getId()))
+                .map(e -> e.getKey())
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Player not found on board"));
 
-    public void printBoard(String boardId) {
-        boardRepository.findById(boardId).ifPresent(Board::imprimir);
-    }
+        board.getMap().remove(currentPos);
+        Point newPos = new Point(newX, newY);
+        player.setPositionX(newX);
+        player.setPositionY(newY);
+        board.getMap().put(newPos, player);
 
-    public void clearPosition(String boardId, Point point) {
-        Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalStateException("Board not found: " + boardId));
-        board.setItem(point, null);
-        boardRepository.save(board);
+        BoardDocument doc = BoardMapper.toDocument(board);
+        boardRepository.save(doc);
+
+        return board;
     }
 }
