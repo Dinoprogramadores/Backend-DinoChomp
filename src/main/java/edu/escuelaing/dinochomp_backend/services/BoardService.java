@@ -5,11 +5,13 @@ import edu.escuelaing.dinochomp_backend.model.board.BoardDocument;
 import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.repository.BoardRepository;
+import edu.escuelaing.dinochomp_backend.repository.FoodRepository;
 import edu.escuelaing.dinochomp_backend.utils.mappers.BoardMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.awt.Point;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -17,6 +19,7 @@ import java.util.Optional;
 public class BoardService {
 
     private final BoardRepository boardRepository;
+    private final FoodRepository foodRepository;
 
     public Board createBoard(int width, int height) {
         Board board = new Board(width, height);
@@ -65,12 +68,19 @@ public class BoardService {
         Point currentPos = board.getMap().entrySet().stream()
                 .filter(e -> e.getValue() instanceof Player
                         && ((Player) e.getValue()).getId().equals(player.getId()))
-                .map(e -> e.getKey())
+                .map(Map.Entry::getKey)
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Player not found on board"));
 
-        board.getMap().remove(currentPos);
         Point newPos = new Point(newX, newY);
+
+        Object objAtNewPos = board.getMap().get(newPos);
+        if (objAtNewPos instanceof Food food) {
+            board.getMap().remove(newPos);
+            foodRepository.deleteById(food.getId());
+            player.setHealth(player.getHealth() + food.getNutritionValue());
+        }
+        board.getMap().remove(currentPos);
         player.setPositionX(newX);
         player.setPositionY(newY);
         board.getMap().put(newPos, player);
@@ -80,4 +90,5 @@ public class BoardService {
 
         return board;
     }
+
 }

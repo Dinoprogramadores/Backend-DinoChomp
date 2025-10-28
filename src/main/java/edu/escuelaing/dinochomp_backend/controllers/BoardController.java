@@ -1,9 +1,10 @@
-package edu.escuelaing.dinochomp_backend.controller;
+package edu.escuelaing.dinochomp_backend.controllers;
 
 import edu.escuelaing.dinochomp_backend.model.board.Board;
 import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.services.BoardService;
+import edu.escuelaing.dinochomp_backend.services.PlayerService;
 import edu.escuelaing.dinochomp_backend.utils.dto.board.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class BoardController {
 
     private final BoardService boardService;
+    private final PlayerService playerService;
 
     @PostMapping
     public ResponseEntity<Board> createBoard(@RequestBody CreateBoardRequestDTO dto) {
@@ -52,10 +54,16 @@ public class BoardController {
 
     @PostMapping("/{boardId}/players/move")
     public ResponseEntity<Board> movePlayer(@PathVariable String boardId, @RequestBody MovePlayerDTO dto) {
-        // ⚠️ En un caso real, deberías recuperar al jugador del servicio o la BD
-        Player player = new Player();
-        player.setId(dto.getPlayerId());
-        Board updated = boardService.movePlayer(boardId, player, dto.getNewX(), dto.getNewY());
-        return ResponseEntity.ok(updated);
+        Player player = playerService.getPlayerById(dto.getPlayerId())
+                .orElseThrow(() -> new IllegalStateException("Player not found: " + dto.getPlayerId()));
+
+        Board updatedBoard = boardService.movePlayer(boardId, player, dto.getNewX(), dto.getNewY());
+
+        player.setPositionX(dto.getNewX());
+        player.setPositionY(dto.getNewY());
+        playerService.savePlayer(player);
+
+        return ResponseEntity.ok(updatedBoard);
     }
+
 }
