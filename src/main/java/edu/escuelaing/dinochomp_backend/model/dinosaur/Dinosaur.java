@@ -1,7 +1,7 @@
 package edu.escuelaing.dinochomp_backend.model.dinosaur;
 
 import org.springframework.data.mongodb.core.mapping.*;
-import jakarta.persistence.Id;
+import org.springframework.data.annotation.Id;
 import lombok.*;
 
 

@@ -2,6 +2,7 @@ package edu.escuelaing.dinochomp_backend.model.power;
 
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import org.springframework.data.mongodb.core.mapping.Document;
+
 import lombok.*;
 
 @Getter

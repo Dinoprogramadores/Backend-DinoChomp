@@ -1,8 +1,8 @@
 package edu.escuelaing.dinochomp_backend.model.food;
 
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.annotation.Id;
 
-import jakarta.persistence.Id;
 import lombok.*;
 
 @Getter
