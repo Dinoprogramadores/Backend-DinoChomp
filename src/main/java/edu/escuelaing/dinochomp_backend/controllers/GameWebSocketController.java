@@ -20,6 +20,19 @@ public class GameWebSocketController {
     @Autowired
     private SimpMessagingTemplate template;
 
+    @MessageMapping("/games/{gameId}/start")
+    public void startGame(@DestinationVariable String gameId) {
+        gameService.startGameLoop(gameId);
+        template.convertAndSend("/topic/games/" + gameId + "/status", "Game started!");
+    }
+
+    @MessageMapping("/games/{gameId}/stop")
+    public void stopGame(@DestinationVariable String gameId) {
+        gameService.stopGameLoop(gameId);
+        template.convertAndSend("/topic/games/" + gameId + "/status", "Game stopped!");
+    }
+
+
     // Cliente envía a: /app/games/{gameId}/move
     @MessageMapping("/games/{gameId}/move")
     public void handleMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage msg) {
@@ -27,7 +40,6 @@ public class GameWebSocketController {
             return;
         }
 
-        // se asume que gameService.movePlayer aplica validaciones y retorna el Player actualizado o null
         Player p = gameService.movePlayer(msg.getPlayerId(), msg.getDirection());
         if (p != null) {
             PlayerPositionDTO dto = new PlayerPositionDTO(
@@ -37,6 +49,7 @@ public class GameWebSocketController {
                     p.getHealth(),
                     p.isAlive()
             );
+            // Enviar actualización a todos los clientes suscritos
             template.convertAndSend("/topic/games/" + gameId + "/players", dto);
         }
     }

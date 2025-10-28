@@ -9,6 +9,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
+// DTO for player move messages from the front client
 public class PlayerMoveMessage implements Serializable {
     private String playerId;
     private String direction; // "UP","DOWN","LEFT","RIGHT" or custom
