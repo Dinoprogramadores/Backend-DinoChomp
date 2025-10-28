@@ -4,7 +4,10 @@ import edu.escuelaing.dinochomp_backend.model.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.Game;
 import edu.escuelaing.dinochomp_backend.model.Player;
 import edu.escuelaing.dinochomp_backend.repository.GameRepository;
+import edu.escuelaing.dinochomp_backend.utils.dto.PlayerPositionDTO;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -12,21 +15,50 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class GameService {
+    // send messages to the socket
+    @Autowired
+    private SimpMessagingTemplate template;
 
     @Autowired
     private GameRepository gameRepository;
+    // Map to hold scheduled game loops
+    private final Map<String, java.util.concurrent.ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
+    // Scheduler for game loops
+    private final java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors
+            .newScheduledThreadPool(4);
 
     private final Map<String, Player> players = new ConcurrentHashMap<>();
+
+    public void startGameLoop(String gameId) {
+        if (gameLoops.containsKey(gameId)) {
+            return; // Ya está corriendo
+        }
+
+        ScheduledFuture<?> loop = scheduler.scheduleAtFixedRate(() -> {
+            reduceHealthOverTime(gameId); // apply damage to all players per second
+        }, 0, 1, TimeUnit.SECONDS);
+
+        gameLoops.put(gameId, loop);
+    }
     
+    public void stopGameLoop(String gameId) {
+        ScheduledFuture<?> loop = gameLoops.remove(gameId);
+        if (loop != null) {
+            loop.cancel(true);
+        }
+    }
+
     public Player addPlayer(String id) {
         Player player = new Player();
         players.put(id, player);
         return player;
     }
-    
+
     public Player movePlayer(String id, String direction) {
         Player player = players.get(id);
         if (player != null && player.isAlive()) {
@@ -37,24 +69,32 @@ public class GameService {
         return player;
     }
 
-        public void reduceHealthOverTime() {
-            for (Player player : players.values()) {
-                if (player.isAlive()) {
-                    player.setHealth(player.getHealth() - 5);
-                    if (player.getHealth() <= 0) {
-                        player.setAlive(false);
-                    }
+    public void reduceHealthOverTime(String gameId) {
+        for (Player player : players.values()) {
+            if (player.isAlive()) {
+                player.setHealth(player.getHealth() - 5);
+                if (player.getHealth() <= 0) {
+                    player.setAlive(false);
                 }
+
+                PlayerPositionDTO dto = new PlayerPositionDTO(
+                        player.getId(),
+                        player.getPositionX(),
+                        player.getPositionY(),
+                        player.getHealth(),
+                        player.isAlive());
+
+                template.convertAndSend("/topic/games/" + gameId + "/players", dto);
             }
-        
+        }
     }
-    
+
     public void decreaseHealthForAll() {
         for (Player p : players.values()) {
             p.loseHealth(1);
         }
     }
-    
+
     public Game createGame(Game game) {
         // nombre es el id
         return gameRepository.save(game);
