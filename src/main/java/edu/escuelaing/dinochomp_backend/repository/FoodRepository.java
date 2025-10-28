@@ -1,10 +1,10 @@
 package edu.escuelaing.dinochomp_backend.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-
-
 import edu.escuelaing.dinochomp_backend.model.food.Food;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
 
-public interface FoodRepository extends JpaRepository<Food,String> {
+@Repository
+public interface FoodRepository extends MongoRepository<Food,String> {
     
 }

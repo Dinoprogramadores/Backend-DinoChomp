@@ -1,9 +1,10 @@
 package edu.escuelaing.dinochomp_backend.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import edu.escuelaing.dinochomp_backend.model.game.Player;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
 
-public interface PlayerRepository extends JpaRepository<Player,String>{
+@Repository
+public interface PlayerRepository extends MongoRepository<Player,String> {
     
 }
