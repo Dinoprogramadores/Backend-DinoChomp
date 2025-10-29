@@ -123,6 +123,9 @@ public class GameService {
                 case "LEFT" -> player.setPositionX(Math.max(0, player.getPositionX() - 1));
                 case "RIGHT" -> player.setPositionX(Math.min(width - 1, player.getPositionX() + 1));
             }
+        
+            Game game = gameRepository.findById(gameId).orElseThrow(() -> new RuntimeException("No game found"));
+            boardService.movePlayer(game.getBoardId(), player, player.getPositionX(), player.getPositionY());
 
             // Después de mover, notificamos a todos los jugadores
             PlayerPositionDTO dto = new PlayerPositionDTO(
@@ -167,7 +170,7 @@ public class GameService {
         if (Boolean.TRUE.equals(powerAvailable.get(gameId))) {
             return; // Ya hay un poder activo
         }
-
+        
         powerAvailable.put(gameId, true);
         powerOwner.remove(gameId);
 
