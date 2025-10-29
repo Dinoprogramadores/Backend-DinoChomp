@@ -22,6 +22,11 @@ public class GameResponseDTO {
      */
     private String nombre;
     /**
+     * ID del tablero del juego.
+     */
+    private String boardId;
+
+    /**
      * Indica si el juego está activo.
      */
     private boolean isActive;
@@ -33,10 +38,6 @@ public class GameResponseDTO {
      * Conjunto de poderes disponibles en el juego.
      */
     private Set<Power> powers;
-    /**
-     * Metadatos adicionales del juego.
-     */
-    private Map<String, Object> metadata;
     /**
      * Duración del juego en minutos.
      */

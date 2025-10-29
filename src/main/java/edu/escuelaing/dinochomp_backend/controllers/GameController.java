@@ -2,6 +2,7 @@ package edu.escuelaing.dinochomp_backend.controllers;
 
 import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.game.Game;
+import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.game.GameRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.game.GameResponseDTO;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -31,7 +33,7 @@ public class GameController {
             return ResponseEntity.badRequest().build();
         }
         Game entity = gameMapper.toEntity(gameRequest);
-        Game created = gameService.createGame(entity);
+        Game created = gameService.createGame(entity, gameRequest.getTotalFood());
         return new ResponseEntity<>(gameMapper.toDTO(created), HttpStatus.CREATED);
     }
 
@@ -89,6 +91,20 @@ public class GameController {
     @GetMapping("/{id}/timer/remaining")
     public ResponseEntity<Long> getRemaining(@PathVariable String id) {
         return gameService.getRemainingSeconds(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/winner")
+    public ResponseEntity<Player> getWinner(@PathVariable String id) {
+        return gameService.getWinner(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/winner/compute")
+    public ResponseEntity<Player> computeWinner(@PathVariable String id) {
+        return gameService.computeAndSetWinner(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

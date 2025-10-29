@@ -25,7 +25,6 @@ public class GameMapper {
                 .isActive(dto.isActive())
                 .playerDinosaurMap(dinos)
                 .powers(dto.getPowers())
-                .metadata(dto.getMetadata())
                 .durationMinutes(dto.getDurationMinutes())
                 .build();
     }
@@ -40,10 +39,10 @@ public class GameMapper {
         }
         return GameResponseDTO.builder()
                 .nombre(g.getNombre())
+                .boardId(g.getBoard() != null ? g.getBoard().getId() : null)
                 .isActive(g.isActive())
                 .playerDinosaurMap(dinos)
                 .powers(g.getPowers())
-                .metadata(g.getMetadata())
                 .durationMinutes(g.getDurationMinutes())
                 .startTime(g.getStartTime())
                 .timerActive(g.isTimerActive())

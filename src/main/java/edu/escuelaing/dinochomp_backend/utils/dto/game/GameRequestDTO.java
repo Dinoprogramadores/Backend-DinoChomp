@@ -18,7 +18,9 @@ public class GameRequestDTO {
     // key = playerId (String) -> DinosaurDTO
     private Map<String, DinosaurRequestDTO> playerDinosaurMap;
     private Set<Power> powers;
-    private Map<String, Object> metadata;
+    private int width;
+    private int height;
+    private int totalFood;
     private int durationMinutes;
 }
 

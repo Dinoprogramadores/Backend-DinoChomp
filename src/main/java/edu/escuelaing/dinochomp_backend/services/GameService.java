@@ -1,24 +1,31 @@
 package edu.escuelaing.dinochomp_backend.services;
 
+import edu.escuelaing.dinochomp_backend.model.board.Board;
 import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
+import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.model.game.Game;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
+import edu.escuelaing.dinochomp_backend.repository.BoardRepository;
+import edu.escuelaing.dinochomp_backend.repository.FoodRepository;
 import edu.escuelaing.dinochomp_backend.repository.GameRepository;
+import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 
+import edu.escuelaing.dinochomp_backend.utils.mappers.BoardMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.awt.*;
 import java.time.Instant;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class GameService {
@@ -28,9 +35,17 @@ public class GameService {
 
     @Autowired
     private GameRepository gameRepository;
+    @Autowired
+    private FoodRepository foodRepository;
+    @Autowired
+    private BoardRepository boardRepository;
+    @Autowired
+    private PlayerRepository playerRepository;
 
     @Autowired
     private PlayerService playerService;
+    @Autowired
+    private BoardService boardService;
 
     // Map con todos los jugadores agrupados por ID de juego
     private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
@@ -159,9 +174,59 @@ public class GameService {
         System.out.println("⚡ Poder activado en juego " + gameId);
     }
 
-    public Game createGame(Game game) {
-        // nombre es el id
+    // Nuevo: crear juego y sembrar comida aleatoria según totalFood
+    public Game createGame(Game game, int totalFood) {
+        if (game == null) throw new IllegalArgumentException("game required");
+        Board board = boardService.createBoard(game.getWidth(), game.getHeight());
+        game.setBoard(board);
+        System.out.println("Partida: " + game.getNombre() + "Tablero: " + game.getBoard());
+        if (board != null && totalFood > 0) {
+            seedFood(board, totalFood);
+        }
+        System.out.println("DEBUG MAP: " + game.getPlayerDinosaurMap());
+        boardRepository.save(BoardMapper.toDocument(board));
         return gameRepository.save(game);
+    }
+
+    private void seedFood(Board board, int totalFood) {
+        int width = board.getWidth();
+        int height = board.getHeight();
+
+        if (width <= 2 || height <= 2 || totalFood <= 0) return;
+
+        Random random = new Random();
+        int placed = 0;
+        int maxAttempts = totalFood * 5; // evita bucles infinitos si el tablero está lleno
+        int attempts = 0;
+
+        while (placed < totalFood && attempts < maxAttempts) {
+            attempts++;
+
+            int x = random.nextInt(width);
+            int y = random.nextInt(height);
+
+            // Evitar esquinas
+            boolean isCorner = (x == 0 && y == 0)
+                    || (x == 0 && y == height - 1)
+                    || (x == width - 1 && y == 0)
+                    || (x == width - 1 && y == height - 1);
+            if (isCorner) continue;
+
+            Point p = new Point(x, y);
+            if (!board.isNull(p)) continue; // ya ocupado
+
+            // Crear y agregar el Food
+            Food f = Food.builder()
+                    .name("pollo")
+                    .positionX(x)
+                    .positionY(y)
+                    .nutritionValue(10)
+                    .build();
+
+            board.addFood(f);
+            foodRepository.save(f);
+            placed++;
+        }
     }
 
     public List<Game> getAllGames() {
@@ -177,7 +242,6 @@ public class GameService {
             g.setActive(updated.isActive());
             g.setPlayerDinosaurMap(updated.getPlayerDinosaurMap());
             g.setPowers(updated.getPowers());
-            g.setMetadata(updated.getMetadata());
             g.setDurationMinutes(updated.getDurationMinutes());
             g.setStartTime(updated.getStartTime());
             g.setTimerActive(updated.isTimerActive());
@@ -224,5 +288,57 @@ public class GameService {
             g.refreshTimerState();
             return g.getRemainingSeconds();
         });
+    }
+    // Obtener el winner almacenado en el Game
+    public Optional<Player> getWinner(String gameId) {
+        return gameRepository.findById(gameId).map(Game::getWinner);
+    }
+
+    // Calcular y establecer el winner según reglas, y retornar el ganador
+    public Optional<Player> computeAndSetWinner(String gameId) {
+        Optional<Game> optGame = gameRepository.findById(gameId);
+        if (optGame.isEmpty()) return Optional.empty();
+        Game game = optGame.get();
+
+        Map<String, Dinosaur> pdm = game.getPlayerDinosaurMap();
+        if (pdm == null || pdm.isEmpty()) {
+            game.setWinner(null);
+            gameRepository.save(game);
+            return Optional.empty();
+        }
+
+        Set<String> playerIds = pdm.keySet();
+        // findAllById devuelve Iterable, lo convertimos a lista
+        List<Player> playersInGame = new ArrayList<>(playerRepository.findAllById(playerIds));
+        if (playersInGame.isEmpty()) {
+            game.setWinner(null);
+            gameRepository.save(game);
+            return Optional.empty();
+        }
+
+        List<Player> alive = playersInGame.stream().filter(Player::isAlive).collect(Collectors.toList());
+        Player winner;
+        if (alive.size() == 1) {
+            winner = alive.get(0);
+        } else if (alive.size() > 1) {
+            winner = pickByHighestHealthThenFirst(alive);
+        } else { // nadie vivo: elegir por mayor health entre todos
+            winner = pickByHighestHealthThenFirst(playersInGame);
+        }
+
+        game.setWinner(winner);
+        gameRepository.save(game);
+        return Optional.ofNullable(winner);
+    }
+
+    private Player pickByHighestHealthThenFirst(List<Player> candidates) {
+        if (candidates.isEmpty()) return null;
+        int maxHealth = candidates.stream().mapToInt(Player::getHealth).max().orElse(Integer.MIN_VALUE);
+        List<Player> maxes = candidates.stream()
+                .filter(p -> p.getHealth() == maxHealth)
+                .collect(Collectors.toList());
+        if (maxes.size() == 1) return maxes.get(0);
+        // Desempate: elegir el "primero" determinístico. Usamos id ascendente para consistencia.
+        return maxes.stream().min(Comparator.comparing(Player::getId)).orElse(maxes.get(0));
     }
 }

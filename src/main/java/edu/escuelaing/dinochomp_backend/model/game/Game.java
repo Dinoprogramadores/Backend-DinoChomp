@@ -1,5 +1,6 @@
 package edu.escuelaing.dinochomp_backend.model.game;
 
+import edu.escuelaing.dinochomp_backend.model.board.Board;
 import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.utils.enums.Power;
 import lombok.*;
@@ -33,7 +34,13 @@ public class Game {
 
     private Set<Power> powers = new HashSet<>();
 
-    private Map<String, Object> metadata = new HashMap<>();
+    private Player winner; //ganador del juego
+
+    private Board board; // tablero del juego
+
+    private int width;
+
+    private int height;
 
     // Temporizador: duración en minutos, instante de inicio y flag
     private int durationMinutes = 0;
