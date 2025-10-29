@@ -12,6 +12,7 @@ import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 
 import edu.escuelaing.dinochomp_backend.utils.mappers.BoardMapper;
+import edu.escuelaing.dinochomp_backend.utils.mappers.PlayerMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -261,6 +262,14 @@ public class GameService {
     public Optional<Game> addPlayerDinosaur(String gameId, String playerId, Dinosaur dinosaur) {
         return gameRepository.findById(gameId).flatMap(g -> {
             boolean ok = g.addPlayerDinosaur(playerId, dinosaur);
+            Player player = playerRepository.getPlayerById(playerId);
+            Game game = gameRepository.findById(gameId).get();
+            try{
+                boardService.addPlayer(game.getBoardId(), player);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
             if (!ok) {
                 return Optional.empty();
             }
