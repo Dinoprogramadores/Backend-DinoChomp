@@ -32,15 +32,35 @@ public class GameWebSocketController {
         template.convertAndSend("/topic/games/" + gameId + "/status", "Game stopped!");
     }
 
-
-   // Cliente envía a: /app/games/{gameId}/move
+    // Cliente envía a: /app/games/{gameId}/move
     @MessageMapping("/games/{gameId}/move")
     public void handleMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage msg) {
         if (msg == null || msg.getPlayerId() == null || msg.getDirection() == null) {
             return;
         }
+        Player updated = gameService.movePlayer(gameId, msg.getPlayerId(), msg.getDirection());
+        if (updated == null) {
+            System.out.println("⚠️ Movimiento inválido o jugador no encontrado"
+                    );
+            return; // Evita el NPE
+        }
+        PlayerPositionDTO dto = PlayerPositionDTO.builder()
+                .id(updated.getId())
+                .positionX(updated.getPositionX())
+                .positionY(updated.getPositionY())
+                .health(updated.getHealth())
+                .isAlive(updated.isAlive())
+                .build();
 
-        // Mueve al jugador dentro del contexto del juego
-        gameService.movePlayer(gameId, msg.getPlayerId(), msg.getDirection());
+        template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+    }
+
+    @MessageMapping("/games/{gameId}/join")
+    public void joinGame(@DestinationVariable String gameId, @Payload Player player) {
+        if (player == null || player.getId() == null) {
+        System.err.println("❌ Jugador inválido en join");
+        return;
+        }
+        gameService.registerPlayer(gameId, player);
     }
 }

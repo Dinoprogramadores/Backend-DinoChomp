@@ -28,39 +28,75 @@ public class GameService {
 
     @Autowired
     private GameRepository gameRepository;
-    
+
+    @Autowired
+    private PlayerService playerService;
+
     // Map con todos los jugadores agrupados por ID de juego
     private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
 
     // Scheduler para reducir vida por segundo
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private final Map<String, ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
+    // poderes disponibles por juego
+    private final Map<String, Boolean> powerAvailable = new ConcurrentHashMap<>();
+    // jugador que tiene el poder activo por juego
+    private final Map<String, String> powerOwner = new ConcurrentHashMap<>();
+
+    public void registerPlayer(String gameId, Player player) {
+        if (player == null || player.getId() == null) {
+            throw new RuntimeException("Player inválido");
+        }
+
+        // Si no existe el mapa del juego, lo crea
+        activePlayers.putIfAbsent(gameId, new ConcurrentHashMap<>());
+
+        // Agrega o actualiza al jugador
+        activePlayers.get(gameId).put(player.getId(), player);
+
+        System.out.println("✅ Jugador " + player.getId() + " agregado a activePlayers del juego " + gameId);
+
+        // Notifica a todos los jugadores conectados al juego
+        PlayerPositionDTO dto = new PlayerPositionDTO(
+                player.getId(),
+                player.getPositionX(),
+                player.getPositionY(),
+                player.getHealth(),
+                player.isAlive());
+
+        template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+    }
 
     public void startGameLoop(String gameId) {
         if (gameLoops.containsKey(gameId)) {
             return; // Ya está corriendo
         }
-
+        // hilo que reduce vida cada segundo
         ScheduledFuture<?> loop = scheduler.scheduleAtFixedRate(() -> {
-            reduceHealthOverTime(gameId); // apply damage to all players per second
+            reduceHealthOverTime(gameId); // aplica daño a todos los jugadores de la partida
         }, 0, 1, TimeUnit.SECONDS);
 
         gameLoops.put(gameId, loop);
+        // hilo que activa poderes cada 30 segundos
+        scheduler.scheduleAtFixedRate(() -> {
+            activatePower(gameId);
+        }, 10, 30, TimeUnit.SECONDS);
     }
-    
+
     public void stopGameLoop(String gameId) {
         ScheduledFuture<?> loop = gameLoops.remove(gameId);
-        if (loop != null) loop.cancel(true);
+        if (loop != null)
+            loop.cancel(true);
     }
-
-
 
     public Player movePlayer(String gameId, String playerId, String direction) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
-        if (gamePlayers == null) return null;
+        if (gamePlayers == null)
+            return null;
 
         Player player = gamePlayers.get(playerId);
-        if (player == null || !player.isAlive()) return null;
+        if (player == null || !player.isAlive())
+            return null;
 
         synchronized (player) {
             switch (direction.toUpperCase()) {
@@ -70,7 +106,7 @@ public class GameService {
                 case "RIGHT" -> player.setPositionX(player.getPositionX() + 1);
             }
 
-            // ✅ Aquí podrías validar colisiones o límites del tablero
+            // Aquí podrías validar colisiones o límites del tablero
 
             // Después de mover, notificamos a todos los jugadores
             PlayerPositionDTO dto = new PlayerPositionDTO(
@@ -78,17 +114,17 @@ public class GameService {
                     player.getPositionX(),
                     player.getPositionY(),
                     player.getHealth(),
-                    player.isAlive()
-            );
+                    player.isAlive());
             template.convertAndSend("/topic/games/" + gameId + "/players", dto);
         }
 
         return player;
     }
 
-     public void reduceHealthOverTime(String gameId) {
+    public void reduceHealthOverTime(String gameId) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
-        if (gamePlayers == null) return;
+        if (gamePlayers == null)
+            return;
 
         for (Player player : gamePlayers.values()) {
             if (player.isAlive()) {
@@ -102,14 +138,24 @@ public class GameService {
                         player.getPositionX(),
                         player.getPositionY(),
                         player.getHealth(),
-                        player.isAlive()
-                );
+                        player.isAlive());
 
                 template.convertAndSend("/topic/games/" + gameId + "/players", dto);
             }
         }
     }
 
+    public void activatePower(String gameId) {
+        if (Boolean.TRUE.equals(powerAvailable.get(gameId))) {
+            return; // Ya hay un poder activo
+        }
+
+        powerAvailable.put(gameId, true);
+        powerOwner.remove(gameId);
+
+        template.convertAndSend("/topic/games/" + gameId + "/power", "AVAILABLE");
+        System.out.println("⚡ Poder activado en juego " + gameId);
+    }
 
     public Game createGame(Game game) {
         // nombre es el id

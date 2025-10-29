@@ -26,7 +26,7 @@ public class Player extends BoardItem {
     private int health;
     private boolean isAlive;
 
-    
+
 
     public void move(String direction) {
         switch (direction) {
