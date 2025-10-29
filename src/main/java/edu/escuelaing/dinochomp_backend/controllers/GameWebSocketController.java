@@ -33,24 +33,14 @@ public class GameWebSocketController {
     }
 
 
-    // Cliente envía a: /app/games/{gameId}/move
+   // Cliente envía a: /app/games/{gameId}/move
     @MessageMapping("/games/{gameId}/move")
     public void handleMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage msg) {
         if (msg == null || msg.getPlayerId() == null || msg.getDirection() == null) {
             return;
         }
 
-        Player p = gameService.movePlayer(msg.getPlayerId(), msg.getDirection());
-        if (p != null) {
-            PlayerPositionDTO dto = new PlayerPositionDTO(
-                    p.getId(),
-                    p.getPositionX(),
-                    p.getPositionY(),
-                    p.getHealth(),
-                    p.isAlive()
-            );
-            // Enviar actualización a todos los clientes suscritos
-            template.convertAndSend("/topic/games/" + gameId + "/players", dto);
-        }
+        // Mueve al jugador dentro del contexto del juego
+        gameService.movePlayer(gameId, msg.getPlayerId(), msg.getDirection());
     }
 }

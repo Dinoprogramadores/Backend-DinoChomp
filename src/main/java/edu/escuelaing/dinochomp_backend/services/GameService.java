@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -26,13 +28,13 @@ public class GameService {
 
     @Autowired
     private GameRepository gameRepository;
-    // Map to hold scheduled game loops
-    private final Map<String, java.util.concurrent.ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
-    // Scheduler for game loops
-    private final java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors
-            .newScheduledThreadPool(4);
+    
+    // Map con todos los jugadores agrupados por ID de juego
+    private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
 
-    private final Map<String, Player> players = new ConcurrentHashMap<>();
+    // Scheduler para reducir vida por segundo
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
+    private final Map<String, ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
 
     public void startGameLoop(String gameId) {
         if (gameLoops.containsKey(gameId)) {
@@ -48,29 +50,47 @@ public class GameService {
     
     public void stopGameLoop(String gameId) {
         ScheduledFuture<?> loop = gameLoops.remove(gameId);
-        if (loop != null) {
-            loop.cancel(true);
-        }
+        if (loop != null) loop.cancel(true);
     }
 
-    public Player addPlayer(String id) {
-        Player player = new Player();
-        players.put(id, player);
-        return player;
-    }
 
-    public Player movePlayer(String id, String direction) {
-        Player player = players.get(id);
-        if (player != null && player.isAlive()) {
-            synchronized (player) {
-                player.move(direction);
+
+    public Player movePlayer(String gameId, String playerId, String direction) {
+        Map<String, Player> gamePlayers = activePlayers.get(gameId);
+        if (gamePlayers == null) return null;
+
+        Player player = gamePlayers.get(playerId);
+        if (player == null || !player.isAlive()) return null;
+
+        synchronized (player) {
+            switch (direction.toUpperCase()) {
+                case "UP" -> player.setPositionY(player.getPositionY() - 1);
+                case "DOWN" -> player.setPositionY(player.getPositionY() + 1);
+                case "LEFT" -> player.setPositionX(player.getPositionX() - 1);
+                case "RIGHT" -> player.setPositionX(player.getPositionX() + 1);
             }
+
+            // ✅ Aquí podrías validar colisiones o límites del tablero
+
+            // Después de mover, notificamos a todos los jugadores
+            PlayerPositionDTO dto = new PlayerPositionDTO(
+                    player.getId(),
+                    player.getPositionX(),
+                    player.getPositionY(),
+                    player.getHealth(),
+                    player.isAlive()
+            );
+            template.convertAndSend("/topic/games/" + gameId + "/players", dto);
         }
+
         return player;
     }
 
-    public void reduceHealthOverTime(String gameId) {
-        for (Player player : players.values()) {
+     public void reduceHealthOverTime(String gameId) {
+        Map<String, Player> gamePlayers = activePlayers.get(gameId);
+        if (gamePlayers == null) return;
+
+        for (Player player : gamePlayers.values()) {
             if (player.isAlive()) {
                 player.setHealth(player.getHealth() - 5);
                 if (player.getHealth() <= 0) {
@@ -82,18 +102,14 @@ public class GameService {
                         player.getPositionX(),
                         player.getPositionY(),
                         player.getHealth(),
-                        player.isAlive());
+                        player.isAlive()
+                );
 
                 template.convertAndSend("/topic/games/" + gameId + "/players", dto);
             }
         }
     }
 
-    public void decreaseHealthForAll() {
-        for (Player p : players.values()) {
-            p.loseHealth(1);
-        }
-    }
 
     public Game createGame(Game game) {
         // nombre es el id
