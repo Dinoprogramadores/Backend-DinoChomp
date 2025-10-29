@@ -1,8 +1,8 @@
 package edu.escuelaing.dinochomp_backend.controllers;
 
-import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.game.Game;
-import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
+import edu.escuelaing.dinochomp_backend.model.game.Player;
+import edu.escuelaing.dinochomp_backend.utils.dto.game.AddPlayerDinosaurGame;
 import edu.escuelaing.dinochomp_backend.utils.dto.game.GameRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.game.GameResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.GameMapper;
@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -64,12 +65,18 @@ public class GameController {
         return ResponseEntity.notFound().build();
     }
 
-    @PostMapping("/{id}/players/{playerId}")
-    public ResponseEntity<GameResponseDTO> addPlayerDinosaur(@PathVariable String id, @PathVariable String playerId, @RequestBody DinosaurRequestDTO dinosaurDTO) {
-        Dinosaur d = gameMapper.toEntity(dinosaurDTO);
-        return gameService.addPlayerDinosaur(id, playerId, d)
+    @PostMapping("/addPlayer")
+    public ResponseEntity<GameResponseDTO> addPlayerDinosaur(@RequestBody AddPlayerDinosaurGame addPlayerDinosaurGame) {
+        return gameService.addPlayerDinosaur(addPlayerDinosaurGame)
                 .map(g -> ResponseEntity.ok(gameMapper.toDTO(g)))
                 .orElse(new ResponseEntity<>(HttpStatus.CONFLICT));
+    }
+
+    @DeleteMapping("/{gameId}/players/{playerName}")
+    public ResponseEntity<Void> removePlayerFromMapByName(@PathVariable String gameId, @PathVariable String playerName) {
+        boolean removed = gameService.removePlayerFromGameByName(gameId, playerName);
+        if (removed) return ResponseEntity.noContent().build();
+        return ResponseEntity.notFound().build();
     }
 
     @PostMapping("/{id}/timer/start")
@@ -89,6 +96,27 @@ public class GameController {
     @GetMapping("/{id}/timer/remaining")
     public ResponseEntity<Long> getRemaining(@PathVariable String id) {
         return gameService.getRemainingSeconds(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/players/dinosaurs")
+    public ResponseEntity<Map<String, String>> getPlayerDinosaurMap(@PathVariable String id) {
+        return gameService.getPlayerDinosaurMap(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/winner")
+    public ResponseEntity<Player> getWinner(@PathVariable String id) {
+        return gameService.getWinner(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/winner/compute")
+    public ResponseEntity<Player> computeWinner(@PathVariable String id) {
+        return gameService.computeAndSetWinner(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

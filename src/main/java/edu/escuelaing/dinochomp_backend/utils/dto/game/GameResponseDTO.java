@@ -1,6 +1,8 @@
 package edu.escuelaing.dinochomp_backend.utils.dto.game;
 
+import edu.escuelaing.dinochomp_backend.model.board.Board;
 import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.enums.Power;
 import lombok.*;
 
@@ -28,15 +30,15 @@ public class GameResponseDTO {
     /**
      * Mapa de dinosaurios de los jugadores.
      */
-    private Map<String, DinosaurRequestDTO> playerDinosaurMap;
+    private Map<String, String> playerDinosaurMap;
     /**
      * Conjunto de poderes disponibles en el juego.
      */
     private Set<Power> powers;
     /**
-     * Metadatos adicionales del juego.
+     * tablero del juego.
      */
-    private Map<String, Object> metadata;
+    private String boardId;
     /**
      * Duración del juego en minutos.
      */

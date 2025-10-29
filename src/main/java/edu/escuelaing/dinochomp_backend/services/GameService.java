@@ -1,9 +1,10 @@
 package edu.escuelaing.dinochomp_backend.services;
 
-import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.game.Game;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.repository.GameRepository;
+import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
+import edu.escuelaing.dinochomp_backend.utils.dto.game.AddPlayerDinosaurGame;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,12 +12,16 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class GameService {
@@ -26,6 +31,9 @@ public class GameService {
 
     @Autowired
     private GameRepository gameRepository;
+
+    @Autowired
+    private PlayerRepository playerRepository;
     // Map to hold scheduled game loops
     private final Map<String, java.util.concurrent.ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
     // Scheduler for game loops
@@ -42,7 +50,6 @@ public class GameService {
         ScheduledFuture<?> loop = scheduler.scheduleAtFixedRate(() -> {
             reduceHealthOverTime(gameId); // apply damage to all players per second
         }, 0, 1, TimeUnit.SECONDS);
-
         gameLoops.put(gameId, loop);
     }
     
@@ -113,7 +120,6 @@ public class GameService {
             g.setActive(updated.isActive());
             g.setPlayerDinosaurMap(updated.getPlayerDinosaurMap());
             g.setPowers(updated.getPowers());
-            g.setMetadata(updated.getMetadata());
             g.setDurationMinutes(updated.getDurationMinutes());
             g.setStartTime(updated.getStartTime());
             g.setTimerActive(updated.isTimerActive());
@@ -129,14 +135,32 @@ public class GameService {
         return false;
     }
 
-    public Optional<Game> addPlayerDinosaur(String gameId, String playerId, Dinosaur dinosaur) {
-        return gameRepository.findById(gameId).flatMap(g -> {
-            boolean ok = g.addPlayerDinosaur(playerId, dinosaur);
+    public Optional<Game> addPlayerDinosaur(AddPlayerDinosaurGame addPlayer) {
+        return gameRepository.findById(addPlayer.getGameId()).flatMap(g -> {
+            boolean ok = g.addPlayerDinosaur(addPlayer.getPlayerId(), addPlayer.getDinosaurName());
             if (!ok) {
                 return Optional.empty();
             }
             return Optional.of(gameRepository.save(g));
         });
+    }
+
+    // Nuevo: eliminar del mapa por nombre de jugador
+    public boolean removePlayerFromGameByName(String gameId, String playerName) {
+        Optional<Game> optGame = gameRepository.findById(gameId);
+        if (optGame.isEmpty()) return false;
+        Game game = optGame.get();
+
+        // Buscar players por nombre y tomar el primero
+        List<Player> playersByName = playerRepository.findByName(playerName);
+        if (playersByName == null || playersByName.isEmpty()) return false;
+        String playerId = playersByName.get(0).getId();
+
+        boolean removed = game.removePlayerDinosaur(playerId);
+        if (removed) {
+            gameRepository.save(game);
+        }
+        return removed;
     }
 
     public Optional<Game> startTimer(String gameId, int minutes) {
@@ -160,5 +184,63 @@ public class GameService {
             g.refreshTimerState();
             return g.getRemainingSeconds();
         });
+    }
+
+    // Nuevo: obtener el mapa playerId -> dinosaurio por id de juego
+    public Optional<Map<String, String>> getPlayerDinosaurMap(String gameId) {
+        return gameRepository.findById(gameId).map(Game::getPlayerDinosaurMap);
+    }
+
+    // Obtener el winner almacenado en el Game
+    public Optional<Player> getWinner(String gameId) {
+        return gameRepository.findById(gameId).map(Game::getWinner);
+    }
+
+    // Calcular y establecer el winner según reglas, y retornar el ganador
+    public Optional<Player> computeAndSetWinner(String gameId) {
+        Optional<Game> optGame = gameRepository.findById(gameId);
+        if (optGame.isEmpty()) return Optional.empty();
+        Game game = optGame.get();
+
+        Map<String, String> pdm = game.getPlayerDinosaurMap();
+        if (pdm == null || pdm.isEmpty()) {
+            game.setWinner(null);
+            gameRepository.save(game);
+            return Optional.empty();
+        }
+
+        Set<String> playerIds = pdm.keySet();
+        // findAllById devuelve Iterable, lo convertimos a lista
+        List<Player> playersInGame = new ArrayList<>(playerRepository.findAllById(playerIds));
+        if (playersInGame.isEmpty()) {
+            game.setWinner(null);
+            gameRepository.save(game);
+            return Optional.empty();
+        }
+
+        List<Player> alive = playersInGame.stream().filter(Player::isAlive).collect(Collectors.toList());
+        Player winner;
+        if (alive.size() == 1) {
+            winner = alive.getFirst();
+        } else if (alive.size() > 1) {
+            winner = pickByHighestHealthThenFirst(alive);
+        } else { // nadie vivo: elegir por mayor health entre todos
+            winner = pickByHighestHealthThenFirst(playersInGame);
+        }
+
+        game.setWinner(winner);
+        gameRepository.save(game);
+        return Optional.ofNullable(winner);
+    }
+
+    private Player pickByHighestHealthThenFirst(List<Player> candidates) {
+        if (candidates.isEmpty()) return null;
+        int maxHealth = candidates.stream().mapToInt(Player::getHealth).max().orElse(Integer.MIN_VALUE);
+        List<Player> maxes = candidates.stream()
+                .filter(p -> p.getHealth() == maxHealth)
+                .collect(Collectors.toList());
+        if (maxes.size() == 1) return maxes.get(0);
+        // Desempate: elegir el "primero" determinístico. Usamos id ascendente para consistencia.
+        return maxes.stream().min(Comparator.comparing(Player::getId)).orElse(maxes.get(0));
     }
 }

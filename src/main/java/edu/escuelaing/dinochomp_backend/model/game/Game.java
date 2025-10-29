@@ -1,6 +1,6 @@
 package edu.escuelaing.dinochomp_backend.model.game;
 
-import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
+import edu.escuelaing.dinochomp_backend.model.board.Board;
 import edu.escuelaing.dinochomp_backend.utils.enums.Power;
 import lombok.*;
 import org.springframework.data.annotation.Id;
@@ -24,16 +24,18 @@ public class Game {
     @Id
     private String nombre; // usado como id
 
-    private boolean isActive;
+    private boolean isActive; //si inicio o no la partida
 
     // Nota: aunque el requerimiento pide "HashMap con key Player", usar objetos como key en JSON/MongoDB provoca problemas.
     // Por eso la implementación interna usa key = playerId (String) -> Dinosaur. En los DTOs aceptamos PlayerDTO o playerId
     // y el mapper convierte adecuadamente.
-    private Map<String, Dinosaur> playerDinosaurMap = new HashMap<>();
+    private Map<String, String> playerDinosaurMap = new HashMap<>();
 
-    private Set<Power> powers = new HashSet<>();
+    private Player winner; //ganador del juego
 
-    private Map<String, Object> metadata = new HashMap<>();
+    private Set<Power> powers = new HashSet<>(); // poderes activos en la partida
+
+    private Board board; // tablero del juego
 
     // Temporizador: duración en minutos, instante de inicio y flag
     private int durationMinutes = 0;
@@ -41,11 +43,17 @@ public class Game {
     private boolean timerActive = false;
 
     // Helper: añade un par playerId -> dinosaur, respetando máximo 4 entries
-    public boolean addPlayerDinosaur(String playerId, Dinosaur dinosaur) {
+    public boolean addPlayerDinosaur(String playerId, String dinosaurName) {
         if (playerDinosaurMap == null) playerDinosaurMap = new HashMap<>();
         if (playerDinosaurMap.size() >= 4) return false;
-        playerDinosaurMap.put(playerId, dinosaur);
+        playerDinosaurMap.put(playerId, dinosaurName);
         return true;
+    }
+
+    // Helper: elimina por playerId si existe
+    public boolean removePlayerDinosaur(String playerId) {
+        if (playerDinosaurMap == null) return false;
+        return playerDinosaurMap.remove(playerId) != null;
     }
 
     // Retorna segundos restantes o null si no aplica
