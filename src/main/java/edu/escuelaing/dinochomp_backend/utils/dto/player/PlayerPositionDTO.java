@@ -13,6 +13,7 @@ import lombok.Setter;
 @Builder
 public class PlayerPositionDTO implements Serializable {
     private String id;
+    private String name;
     private int positionX;
     private int positionY;
     private int health;

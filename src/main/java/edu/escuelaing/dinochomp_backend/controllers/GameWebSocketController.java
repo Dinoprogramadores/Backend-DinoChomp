@@ -46,6 +46,7 @@ public class GameWebSocketController {
         }
         PlayerPositionDTO dto = PlayerPositionDTO.builder()
                 .id(updated.getId())
+                .name(updated.getName())
                 .positionX(updated.getPositionX())
                 .positionY(updated.getPositionY())
                 .health(updated.getHealth())

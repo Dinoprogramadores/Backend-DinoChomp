@@ -59,6 +59,7 @@ public class GameService {
         // Notifica a todos los jugadores conectados al juego
         PlayerPositionDTO dto = new PlayerPositionDTO(
                 player.getId(),
+                player.getName(),
                 player.getPositionX(),
                 player.getPositionY(),
                 player.getHealth(),
@@ -91,26 +92,26 @@ public class GameService {
 
     public Player movePlayer(String gameId, String playerId, String direction) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
+        int height = 6;
+        int width = 10;
         if (gamePlayers == null)
             return null;
-
         Player player = gamePlayers.get(playerId);
         if (player == null || !player.isAlive())
             return null;
 
         synchronized (player) {
             switch (direction.toUpperCase()) {
-                case "UP" -> player.setPositionY(player.getPositionY() - 1);
-                case "DOWN" -> player.setPositionY(player.getPositionY() + 1);
-                case "LEFT" -> player.setPositionX(player.getPositionX() - 1);
-                case "RIGHT" -> player.setPositionX(player.getPositionX() + 1);
+                case "UP" -> player.setPositionY(Math.max(0, player.getPositionY() - 1));
+                case "DOWN" -> player.setPositionY(Math.min(height - 1, player.getPositionY() + 1));
+                case "LEFT" -> player.setPositionX(Math.max(0, player.getPositionX() - 1));
+                case "RIGHT" -> player.setPositionX(Math.min(width - 1, player.getPositionX() + 1));
             }
-
-            // Aquí podrías validar colisiones o límites del tablero
 
             // Después de mover, notificamos a todos los jugadores
             PlayerPositionDTO dto = new PlayerPositionDTO(
                     player.getId(),
+                    player.getName(),
                     player.getPositionX(),
                     player.getPositionY(),
                     player.getHealth(),
@@ -135,6 +136,7 @@ public class GameService {
 
                 PlayerPositionDTO dto = new PlayerPositionDTO(
                         player.getId(),
+                        player.getName(),
                         player.getPositionX(),
                         player.getPositionY(),
                         player.getHealth(),
