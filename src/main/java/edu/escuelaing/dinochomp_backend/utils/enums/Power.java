@@ -4,6 +4,7 @@ public enum Power {
     SPEED,
     SHIELD,
     INVISIBILITY,
-    DOUBLE_POINTS
+    DOUBLE_POINTS,
+    HEALING
 }
 

@@ -1,7 +1,5 @@
 package edu.escuelaing.dinochomp_backend.utils.dto.game;
 
-import edu.escuelaing.dinochomp_backend.model.board.Board;
-import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.enums.Power;
 import lombok.*;
 
@@ -21,6 +19,7 @@ public class GameRequestDTO {
     private Set<Power> powers;
     private int width;
     private int height;
+    private int totalFood;
     private int durationMinutes;
 }
 

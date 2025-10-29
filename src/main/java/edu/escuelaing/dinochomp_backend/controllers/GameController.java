@@ -32,7 +32,7 @@ public class GameController {
             return ResponseEntity.badRequest().build();
         }
         Game entity = gameMapper.toEntity(gameRequest);
-        Game created = gameService.createGame(entity);
+        Game created = gameService.createGame(entity, gameRequest.getTotalFood());
         return new ResponseEntity<>(gameMapper.toDTO(created), HttpStatus.CREATED);
     }
 
