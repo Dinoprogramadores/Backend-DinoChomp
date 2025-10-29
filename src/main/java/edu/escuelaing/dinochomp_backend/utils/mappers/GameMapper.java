@@ -22,6 +22,8 @@ public class GameMapper {
         }
         return Game.builder()
                 .nombre(dto.getNombre())
+                .width(dto.getWidth())
+                .height(dto.getHeight())
                 .isActive(dto.isActive())
                 .playerDinosaurMap(dinos)
                 .powers(dto.getPowers())
@@ -39,7 +41,7 @@ public class GameMapper {
         }
         return GameResponseDTO.builder()
                 .nombre(g.getNombre())
-                .boardId(g.getBoard() != null ? g.getBoard().getId() : null)
+                .boardId(g.getBoardId())
                 .isActive(g.isActive())
                 .playerDinosaurMap(dinos)
                 .powers(g.getPowers())

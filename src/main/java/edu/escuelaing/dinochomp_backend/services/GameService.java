@@ -177,10 +177,11 @@ public class GameService {
     // Nuevo: crear juego y sembrar comida aleatoria según totalFood
     public Game createGame(Game game, int totalFood) {
         if (game == null) throw new IllegalArgumentException("game required");
+        System.out.println("getWidth: " + game.getWidth() + "getHeight: " + game.getHeight());
         Board board = boardService.createBoard(game.getWidth(), game.getHeight());
-        game.setBoard(board);
-        System.out.println("Partida: " + game.getNombre() + "Tablero: " + game.getBoard());
-        if (board != null && totalFood > 0) {
+        game.setBoardId(board.getId());
+        System.out.println("Partida: " + game.getNombre() + "Tablero: " + game.getBoardId());
+        if (totalFood > 0) {
             seedFood(board, totalFood);
         }
         System.out.println("DEBUG MAP: " + game.getPlayerDinosaurMap());

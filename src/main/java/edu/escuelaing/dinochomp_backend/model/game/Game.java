@@ -36,7 +36,7 @@ public class Game {
 
     private Player winner; //ganador del juego
 
-    private Board board; // tablero del juego
+    private String boardId; // tablero del juego
 
     private int width;
 
