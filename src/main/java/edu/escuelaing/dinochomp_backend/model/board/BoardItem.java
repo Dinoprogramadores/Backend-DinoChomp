@@ -8,11 +8,12 @@ import edu.escuelaing.dinochomp_backend.model.game.Player;
 @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.PROPERTY,
-        property = "type"
+        property = "type",
+        defaultImpl = Player.class
 )
 @JsonSubTypes({
         @JsonSubTypes.Type(value = Player.class, name = "PLAYER"),
-        @JsonSubTypes.Type(value = Food.class, name = "FOOD")
+        @JsonSubTypes.Type(value = Food.class, name = "FOOD"),
 })
 public abstract class BoardItem {
 }
