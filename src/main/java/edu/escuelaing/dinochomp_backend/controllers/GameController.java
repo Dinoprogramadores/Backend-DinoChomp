@@ -51,6 +51,21 @@ public class GameController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/{id}/board")
+    public ResponseEntity<Map<String, String>> getBoardIdByGame(@PathVariable String id) {
+        return gameService.getGameById(id)
+                .map(game -> {
+                    if (game.getBoardId() != null) {
+                        return ResponseEntity.ok(Map.of("boardId", game.getBoardId()));
+                    } else {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body(Map.of("error", "El juego no tiene un tablero asociado"));
+                    }
+                })
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Juego no encontrado")));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<GameResponseDTO> updateGame(@PathVariable String id, @RequestBody GameRequestDTO gameRequest) {
         Game updatedEntity = gameMapper.toEntity(gameRequest);

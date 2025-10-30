@@ -12,5 +12,6 @@ public class PowerResponseDTO implements Serializable {
     private String name;
     private String type;
     private int duration; // en segundos
+    private String message;
     
 }
