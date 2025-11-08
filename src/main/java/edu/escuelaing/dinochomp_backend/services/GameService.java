@@ -174,8 +174,51 @@ public class GameService {
         powerAvailable.put(gameId, true);
         powerOwner.remove(gameId);
 
-        template.convertAndSend("/topic/games/" + gameId + "/power", "AVAILABLE");
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("status", "AVAILABLE");
+        payload.put("owner", null);
+        payload.put("timestamp", Instant.now().toString());
+
+        template.convertAndSend("/topic/games/" + gameId + "/power", payload);
         System.out.println("⚡ Poder activado en juego " + gameId);
+    }
+
+    public void claimPower(String gameId, String playerId) {
+        if (!Boolean.TRUE.equals(powerAvailable.get(gameId))) {
+            return; // No hay poder disponible
+        }
+
+        powerAvailable.put(gameId, false);
+        powerOwner.put(gameId, playerId);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("status", "CLAIMED");
+        payload.put("owner", playerId);
+        payload.put("timestamp", Instant.now().toString());
+
+        template.convertAndSend("/topic/games/" + gameId + "/power", payload);
+        System.out.println("⚡ Poder reclamado por jugador " + playerId + " en juego " + gameId);
+    }
+
+    public void usePower(String gameId, String playerId) {
+        String currentOwner = powerOwner.get(gameId);
+        if (!playerId.equals(currentOwner)) {
+            System.out.println("🚫 Jugador " + playerId + " intentó usar un poder que no tiene");
+            return;
+        }
+        Player player = playerRepository.getPlayerById(playerId);
+        player.setHealth(player.getHealth() + 10);
+
+        powerOwner.remove(gameId);
+        powerAvailable.put(gameId, false);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("status", "USED");
+        payload.put("owner", playerId);
+        payload.put("timestamp", Instant.now().toString());
+
+        template.convertAndSend("/topic/games/" + gameId + "/power", payload);
+        System.out.println("💥 Poder usado por " + playerId + " en juego " + gameId);
     }
 
     // Nuevo: crear juego y sembrar comida aleatoria según totalFood
