@@ -32,6 +32,15 @@ public class GameWebSocketController {
         template.convertAndSend("/topic/games/" + gameId + "/status", "Game stopped!");
     }
 
+    @MessageMapping("/games/{gameId}/power/claim")
+    public void claimPower(@DestinationVariable String gameId, String playerId) {
+        gameService.claimPower(gameId, playerId);
+    }
+
+    @MessageMapping("/games/{gameId}/power/use")
+    public void usePower(@DestinationVariable String gameId, String playerId) {
+        gameService.usePower(gameId, playerId);
+    }
     // Cliente envía a: /app/games/{gameId}/move
     @MessageMapping("/games/{gameId}/move")
     public void handleMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage msg) {
