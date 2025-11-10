@@ -69,7 +69,7 @@ public class GameService {
         // Agrega o actualiza al jugador
         activePlayers.get(gameId).put(player.getId(), player);
 
-        System.out.println("✅ Jugador " + player.getId() + " agregado a activePlayers del juego " + gameId);
+        System.out.println("Jugador " + player.getId() + " agregado a activePlayers del juego " + gameId);
 
         // Notifica a todos los jugadores conectados al juego
         PlayerPositionDTO dto = new PlayerPositionDTO(
