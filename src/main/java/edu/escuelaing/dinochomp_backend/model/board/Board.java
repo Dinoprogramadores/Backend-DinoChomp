@@ -80,16 +80,23 @@ public class Board implements Serializable {
         Point destination = new Point(newX, newY);
 
         if (!insideBoard(destination)) return;
-        Object contenidoDestino = map.get(destination);
 
-        if (contenidoDestino == null || contenidoDestino instanceof Food) {
-            map.put(current, null);
-            map.put(destination, player);
-            player.setPositionX(newX);
-            player.setPositionY(newY);
-            act(destination, player);
+        Object objAtDest = map.get(destination);
+
+        if (objAtDest instanceof Player) {
+            return;
         }
+
+        if (objAtDest instanceof Food food) {
+            player.addHealth(food.getNutritionValue());
+        }
+        map.put(current, null);
+        map.put(destination, player);
+
+        player.setPositionX(newX);
+        player.setPositionY(newY);
     }
+
 
     private void act(Point p, Player player) {
         Object obj = map.get(p);

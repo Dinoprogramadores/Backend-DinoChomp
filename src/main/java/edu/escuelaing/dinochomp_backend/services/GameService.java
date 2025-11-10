@@ -108,38 +108,40 @@ public class GameService {
 
     public Player movePlayer(String gameId, String playerId, String direction) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
-        int height = 6;
-        int width = 10;
-        if (gamePlayers == null)
-            return null;
+        if (gamePlayers == null) return null;
+
         Player player = gamePlayers.get(playerId);
-        if (player == null || !player.isAlive())
-            return null;
+        if (player == null || !player.isAlive()) return null;
 
-        synchronized (player) {
-            switch (direction.toUpperCase()) {
-                case "UP" -> player.setPositionY(Math.max(0, player.getPositionY() - 1));
-                case "DOWN" -> player.setPositionY(Math.min(height - 1, player.getPositionY() + 1));
-                case "LEFT" -> player.setPositionX(Math.max(0, player.getPositionX() - 1));
-                case "RIGHT" -> player.setPositionX(Math.min(width - 1, player.getPositionX() + 1));
-            }
-        
-            Game game = gameRepository.findById(gameId).orElseThrow(() -> new RuntimeException("No game found"));
-            boardService.movePlayer(game.getBoardId(), player, player.getPositionX(), player.getPositionY());
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new RuntimeException("No game found"));
 
-            // Después de mover, notificamos a todos los jugadores
-            PlayerPositionDTO dto = new PlayerPositionDTO(
-                    player.getId(),
-                    player.getName(),
-                    player.getPositionX(),
-                    player.getPositionY(),
-                    player.getHealth(),
-                    player.isAlive());
-            template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+        int width = game.getWidth();
+        int height = game.getHeight();
+
+        int newX = player.getPositionX();
+        int newY = player.getPositionY();
+
+        switch (direction.toUpperCase()) {
+            case "UP" -> newY = Math.max(0, newY - 1);
+            case "DOWN" -> newY = Math.min(height - 1, newY + 1);
+            case "LEFT" -> newX = Math.max(0, newX - 1);
+            case "RIGHT" -> newX = Math.min(width - 1, newX + 1);
         }
+        boardService.movePlayer(game.getBoardId(), player, newX, newY);
 
+        PlayerPositionDTO dto = new PlayerPositionDTO(
+                player.getId(),
+                player.getName(),
+                player.getPositionX(),
+                player.getPositionY(),
+                player.getHealth(),
+                player.isAlive());
+
+        template.convertAndSend("/topic/games/" + gameId + "/players", dto);
         return player;
     }
+
 
     public void reduceHealthOverTime(String gameId) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
