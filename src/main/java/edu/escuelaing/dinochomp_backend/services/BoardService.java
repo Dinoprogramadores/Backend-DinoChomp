@@ -61,15 +61,23 @@ public class BoardService {
         return board;
     }
 
-    public Board movePlayer(String boardId, Player player, int newX, int newY) {
+    public Optional<Food> movePlayer(String boardId, Player player, int newX, int newY) {
         Board board = getBoard(boardId)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
-        board.movePlayer(player, newX, newY);
+        Food eatenFood = null;
+        Object itemAtDest = board.getMap().get(new Point(newX, newY));
 
+        if (itemAtDest instanceof Food food) {
+            eatenFood = food;
+        }
+        board.movePlayer(player, newX, newY);
         BoardDocument doc = BoardMapper.toDocument(board);
         boardRepository.save(doc);
-
-        return board;
+        if (eatenFood != null) {
+            foodRepository.deleteById(eatenFood.getId());
+        }
+        return Optional.ofNullable(eatenFood);
     }
+
 
 }

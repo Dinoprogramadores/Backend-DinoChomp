@@ -12,7 +12,6 @@ import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 
 import edu.escuelaing.dinochomp_backend.utils.mappers.BoardMapper;
-import edu.escuelaing.dinochomp_backend.utils.mappers.PlayerMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -128,7 +127,8 @@ public class GameService {
             case "LEFT" -> newX = Math.max(0, newX - 1);
             case "RIGHT" -> newX = Math.min(width - 1, newX + 1);
         }
-        boardService.movePlayer(game.getBoardId(), player, newX, newY);
+
+        Optional<Food> eatenFood = boardService.movePlayer(game.getBoardId(), player, newX, newY);
 
         PlayerPositionDTO dto = new PlayerPositionDTO(
                 player.getId(),
@@ -136,9 +136,19 @@ public class GameService {
                 player.getPositionX(),
                 player.getPositionY(),
                 player.getHealth(),
-                player.isAlive());
-
+                player.isAlive()
+        );
         template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+
+        eatenFood.ifPresent(food -> {
+            Map<String, Object> foodEvent = new HashMap<>();
+            foodEvent.put("action", "FOOD_REMOVED");
+            foodEvent.put("id", food.getId());
+            foodEvent.put("x", food.getPositionX());
+            foodEvent.put("y", food.getPositionY());
+            template.convertAndSend("/topic/games/" + gameId + "/food", foodEvent);
+        });
+
         return player;
     }
 

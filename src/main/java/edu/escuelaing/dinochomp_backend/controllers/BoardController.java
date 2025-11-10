@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/boards")
 @RequiredArgsConstructor
@@ -53,11 +55,11 @@ public class BoardController {
     }
 
     @PostMapping("/{boardId}/players/move")
-    public ResponseEntity<Board> movePlayer(@PathVariable String boardId, @RequestBody MovePlayerDTO dto) {
+    public ResponseEntity<Optional<Food>> movePlayer(@PathVariable String boardId, @RequestBody MovePlayerDTO dto) {
         Player player = playerService.getPlayerById(dto.getPlayerId())
                 .orElseThrow(() -> new IllegalStateException("Player not found: " + dto.getPlayerId()));
 
-        Board updatedBoard = boardService.movePlayer(boardId, player, dto.getNewX(), dto.getNewY());
+        Optional<Food> updatedBoard = boardService.movePlayer(boardId, player, dto.getNewX(), dto.getNewY());
 
         player.setPositionX(dto.getNewX());
         player.setPositionY(dto.getNewY());
