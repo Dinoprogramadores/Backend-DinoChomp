@@ -12,7 +12,6 @@ import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 
 import edu.escuelaing.dinochomp_backend.utils.mappers.BoardMapper;
-import edu.escuelaing.dinochomp_backend.utils.mappers.PlayerMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -54,9 +53,9 @@ public class GameService {
     // Scheduler para reducir vida por segundo
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private final Map<String, ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
-    // poderes disponibles por juego
+    // Poderes disponibles por juego
     private final Map<String, Boolean> powerAvailable = new ConcurrentHashMap<>();
-    // jugador que tiene el poder activo por juego
+    // Jugador que tiene el poder activo por juego
     private final Map<String, String> powerOwner = new ConcurrentHashMap<>();
 
     public void registerPlayer(String gameId, Player player) {
@@ -66,11 +65,37 @@ public class GameService {
 
         // Si no existe el mapa del juego, lo crea
         activePlayers.putIfAbsent(gameId, new ConcurrentHashMap<>());
+        Map<String, Player> players = activePlayers.get(gameId);
 
-        // Agrega o actualiza al jugador
-        activePlayers.get(gameId).put(player.getId(), player);
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new RuntimeException("Game no encontrado: " + gameId));
+        int width = game.getWidth();
+        int height = game.getHeight();
 
-        System.out.println("✅ Jugador " + player.getId() + " agregado a activePlayers del juego " + gameId);
+        Point[] corners = new Point[]{
+                new Point(0, 0),
+                new Point(width-1, 0),
+                new Point(0, height-1),
+                new Point(width-1, height-1)
+        };
+
+        Set<String> occupied = players.values().stream()
+                .map(p -> p.getPositionX() + "," + p.getPositionY())
+                .collect(Collectors.toSet());
+
+        Point spawn = null;
+        for (Point p : corners) {
+            if (!occupied.contains(p.x + "," + p.y)){
+                spawn = p;
+                break;
+            }
+        }
+
+        player.setPositionX(spawn.x);
+        player.setPositionY(spawn.y);
+        players.put(player.getId(), player);
+
+        System.out.println("Jugador " + player.getId() + " agregado a activePlayers del juego " + gameId);
 
         // Notifica a todos los jugadores conectados al juego
         PlayerPositionDTO dto = new PlayerPositionDTO(
@@ -108,38 +133,51 @@ public class GameService {
 
     public Player movePlayer(String gameId, String playerId, String direction) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
-        int height = 6;
-        int width = 10;
-        if (gamePlayers == null)
-            return null;
+        if (gamePlayers == null) return null;
+
         Player player = gamePlayers.get(playerId);
-        if (player == null || !player.isAlive())
-            return null;
+        if (player == null || !player.isAlive()) return null;
 
-        synchronized (player) {
-            switch (direction.toUpperCase()) {
-                case "UP" -> player.setPositionY(Math.max(0, player.getPositionY() - 1));
-                case "DOWN" -> player.setPositionY(Math.min(height - 1, player.getPositionY() + 1));
-                case "LEFT" -> player.setPositionX(Math.max(0, player.getPositionX() - 1));
-                case "RIGHT" -> player.setPositionX(Math.min(width - 1, player.getPositionX() + 1));
-            }
-        
-            Game game = gameRepository.findById(gameId).orElseThrow(() -> new RuntimeException("No game found"));
-            boardService.movePlayer(game.getBoardId(), player, player.getPositionX(), player.getPositionY());
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new RuntimeException("No game found"));
 
-            // Después de mover, notificamos a todos los jugadores
-            PlayerPositionDTO dto = new PlayerPositionDTO(
-                    player.getId(),
-                    player.getName(),
-                    player.getPositionX(),
-                    player.getPositionY(),
-                    player.getHealth(),
-                    player.isAlive());
-            template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+        int width = game.getWidth();
+        int height = game.getHeight();
+
+        int newX = player.getPositionX();
+        int newY = player.getPositionY();
+
+        switch (direction.toUpperCase()) {
+            case "UP" -> newY = Math.max(0, newY - 1);
+            case "DOWN" -> newY = Math.min(height - 1, newY + 1);
+            case "LEFT" -> newX = Math.max(0, newX - 1);
+            case "RIGHT" -> newX = Math.min(width - 1, newX + 1);
         }
+
+        Optional<Food> eatenFood = boardService.movePlayer(game.getBoardId(), player, newX, newY);
+
+        PlayerPositionDTO dto = new PlayerPositionDTO(
+                player.getId(),
+                player.getName(),
+                player.getPositionX(),
+                player.getPositionY(),
+                player.getHealth(),
+                player.isAlive()
+        );
+        template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+
+        eatenFood.ifPresent(food -> {
+            Map<String, Object> foodEvent = new HashMap<>();
+            foodEvent.put("action", "FOOD_REMOVED");
+            foodEvent.put("id", food.getId());
+            foodEvent.put("x", food.getPositionX());
+            foodEvent.put("y", food.getPositionY());
+            template.convertAndSend("/topic/games/" + gameId + "/food", foodEvent);
+        });
 
         return player;
     }
+
 
     public void reduceHealthOverTime(String gameId) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);

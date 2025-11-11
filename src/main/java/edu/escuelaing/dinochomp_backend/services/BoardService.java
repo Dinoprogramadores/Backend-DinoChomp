@@ -61,34 +61,23 @@ public class BoardService {
         return board;
     }
 
-    public Board movePlayer(String boardId, Player player, int newX, int newY) {
+    public Optional<Food> movePlayer(String boardId, Player player, int newX, int newY) {
         Board board = getBoard(boardId)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
+        Food eatenFood = null;
+        Object itemAtDest = board.getMap().get(new Point(newX, newY));
 
-        Point currentPos = board.getMap().entrySet().stream()
-                .filter(e -> e.getValue() instanceof Player
-                        && ((Player) e.getValue()).getId().equals(player.getId()))
-                .map(Map.Entry::getKey)
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Player not found on board"));
-
-        Point newPos = new Point(newX, newY);
-
-        Object objAtNewPos = board.getMap().get(newPos);
-        if (objAtNewPos instanceof Food food) {
-            board.getMap().remove(newPos);
-            foodRepository.deleteById(food.getId());
-            player.setHealth(player.getHealth() + food.getNutritionValue());
+        if (itemAtDest instanceof Food food) {
+            eatenFood = food;
         }
-        board.getMap().remove(currentPos);
-        player.setPositionX(newX);
-        player.setPositionY(newY);
-        board.getMap().put(newPos, player);
-
+        board.movePlayer(player, newX, newY);
         BoardDocument doc = BoardMapper.toDocument(board);
         boardRepository.save(doc);
-
-        return board;
+        if (eatenFood != null) {
+            foodRepository.deleteById(eatenFood.getId());
+        }
+        return Optional.ofNullable(eatenFood);
     }
+
 
 }

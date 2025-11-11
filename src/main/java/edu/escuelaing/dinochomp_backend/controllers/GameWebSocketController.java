@@ -49,7 +49,7 @@ public class GameWebSocketController {
         }
         Player updated = gameService.movePlayer(gameId, msg.getPlayerId(), msg.getDirection());
         if (updated == null) {
-            System.out.println("⚠️ Movimiento inválido o jugador no encontrado"
+            System.out.println("Movimiento inválido o jugador no encontrado"
                     );
             return; // Evita el NPE
         }
@@ -68,7 +68,7 @@ public class GameWebSocketController {
     @MessageMapping("/games/{gameId}/join")
     public void joinGame(@DestinationVariable String gameId, @Payload Player player) {
         if (player == null || player.getId() == null) {
-        System.err.println("❌ Jugador inválido en join");
+        System.err.println("Jugador inválido en join");
         return;
         }
         gameService.registerPlayer(gameId, player);
