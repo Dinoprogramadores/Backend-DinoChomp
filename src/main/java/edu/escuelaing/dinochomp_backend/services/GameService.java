@@ -53,9 +53,9 @@ public class GameService {
     // Scheduler para reducir vida por segundo
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private final Map<String, ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
-    // poderes disponibles por juego
+    // Poderes disponibles por juego
     private final Map<String, Boolean> powerAvailable = new ConcurrentHashMap<>();
-    // jugador que tiene el poder activo por juego
+    // Jugador que tiene el poder activo por juego
     private final Map<String, String> powerOwner = new ConcurrentHashMap<>();
 
     public void registerPlayer(String gameId, Player player) {
@@ -65,9 +65,35 @@ public class GameService {
 
         // Si no existe el mapa del juego, lo crea
         activePlayers.putIfAbsent(gameId, new ConcurrentHashMap<>());
+        Map<String, Player> players = activePlayers.get(gameId);
 
-        // Agrega o actualiza al jugador
-        activePlayers.get(gameId).put(player.getId(), player);
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new RuntimeException("Game no encontrado: " + gameId));
+        int width = game.getWidth();
+        int height = game.getHeight();
+
+        Point[] corners = new Point[]{
+                new Point(0, 0),
+                new Point(width-1, 0),
+                new Point(0, height-1),
+                new Point(width-1, height-1)
+        };
+
+        Set<String> occupied = players.values().stream()
+                .map(p -> p.getPositionX() + "," + p.getPositionY())
+                .collect(Collectors.toSet());
+
+        Point spawn = null;
+        for (Point p : corners) {
+            if (!occupied.contains(p.x + "," + p.y)){
+                spawn = p;
+                break;
+            }
+        }
+
+        player.setPositionX(spawn.x);
+        player.setPositionY(spawn.y);
+        players.put(player.getId(), player);
 
         System.out.println("Jugador " + player.getId() + " agregado a activePlayers del juego " + gameId);
 
