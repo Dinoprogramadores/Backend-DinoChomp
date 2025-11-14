@@ -11,10 +11,12 @@ import edu.escuelaing.dinochomp_backend.repository.GameRepository;
 import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 
+
 import edu.escuelaing.dinochomp_backend.utils.mappers.BoardMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+
 
 import java.awt.*;
 import java.time.Instant;
@@ -46,6 +48,8 @@ public class GameService {
     private PlayerService playerService;
     @Autowired
     private BoardService boardService;
+    @Autowired
+    private PowerService powerService;
 
     // Map con todos los jugadores agrupados por ID de juego
     private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
@@ -57,6 +61,7 @@ public class GameService {
     private final Map<String, Boolean> powerAvailable = new ConcurrentHashMap<>();
     // Jugador que tiene el poder activo por juego
     private final Map<String, String> powerOwner = new ConcurrentHashMap<>();
+
 
     public void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
@@ -122,7 +127,7 @@ public class GameService {
         // hilo que activa poderes cada 30 segundos
         scheduler.scheduleAtFixedRate(() -> {
             activatePower(gameId);
-        }, 10, 30, TimeUnit.SECONDS);
+        }, 10, 10, TimeUnit.SECONDS);
     }
 
     public void stopGameLoop(String gameId) {
@@ -221,20 +226,18 @@ public class GameService {
         System.out.println("⚡ Poder activado en juego " + gameId);
     }
 
-    public void claimPower(String gameId, String playerId) {
+    public synchronized void claimPower(String gameId, String playerId) {
         if (!Boolean.TRUE.equals(powerAvailable.get(gameId))) {
             return; // No hay poder disponible
         }
-
         powerAvailable.put(gameId, false);
         powerOwner.put(gameId, playerId);
-
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "CLAIMED");
         payload.put("owner", playerId);
         payload.put("timestamp", Instant.now().toString());
-
         template.convertAndSend("/topic/games/" + gameId + "/power", payload);
+        usePower(gameId,playerId);
         System.out.println("⚡ Poder reclamado por jugador " + playerId + " en juego " + gameId);
     }
 
@@ -246,10 +249,10 @@ public class GameService {
         }
         Player player = playerRepository.getPlayerById(playerId);
         player.setHealth(player.getHealth() + 10);
-
+        // selecciona un poder de manera random
+        powerService.activateRandomPower(player);
         powerOwner.remove(gameId);
         powerAvailable.put(gameId, false);
-
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "USED");
         payload.put("owner", playerId);

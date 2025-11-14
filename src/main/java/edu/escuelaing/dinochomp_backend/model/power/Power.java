@@ -18,5 +18,5 @@ public abstract class Power {
     private String type; //health, speed, shield, etc.
 
     
-    public abstract void applyEffect(Player player);
+    public abstract Player applyEffect(Player player);
 }
