@@ -76,4 +76,6 @@ public class GameWebSocketController {
         }
         gameService.registerPlayer(gameId, player);
     }
+
+    
 }

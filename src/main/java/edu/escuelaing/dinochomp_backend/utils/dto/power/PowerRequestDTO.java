@@ -10,8 +10,8 @@ import lombok.*;
 @Builder
 public class PowerRequestDTO implements Serializable {
     private String name;
-    private int duration; // en segundos
-    private String type;  
+    private int health;
+    
 
 
 }

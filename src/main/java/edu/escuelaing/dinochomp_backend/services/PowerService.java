@@ -1,5 +1,7 @@
 package edu.escuelaing.dinochomp_backend.services;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -23,9 +25,11 @@ public class PowerService {
     private PlayerRepository playerRepository;
 
     // lista de poderes disponibles
-    private final List<Supplier<Power>> powerPool = List.of(
-    () -> new HealthPower(20)
-    );
+    private final List<Supplier<Power>> powerPool =
+    new ArrayList<>(Arrays.asList(
+        () -> new HealthPower(20)
+    ));
+
 
     private final Random random = new Random();
 
@@ -53,8 +57,6 @@ public class PowerService {
     public Optional<Power> updatePower(String name, Power powerDetails) {
         return powerRepository.findById(name).map(player -> {
             player.setName(powerDetails.getName());
-            player.setDuration(powerDetails.getDuration());
-            player.setType(powerDetails.getType());
             return powerRepository.save(player);
         });
     }
@@ -63,10 +65,13 @@ public class PowerService {
     }
 
     // Activar un poder aleatorio para un jugador
-    public void activateRandomPower(Player player) {
+    public Player activateRandomPower(Player player) {
+        System.out.println("poder random asignado a: "+player.getId());
         Power selectedPower = powerPool.get(random.nextInt(powerPool.size())).get();
-        player = selectedPower.applyEffect(player);
-        playerRepository.save(player);
+        Player newPlayer = selectedPower.applyEffect(player);
+        System.out.println("id DEL NEWPLAYER "+newPlayer.getId());
+        playerRepository.save(newPlayer);
+        return newPlayer;
     }
     
 }
