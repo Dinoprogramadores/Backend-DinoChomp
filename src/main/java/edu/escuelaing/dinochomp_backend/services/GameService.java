@@ -41,7 +41,6 @@ public class GameService {
     private BoardRepository boardRepository;
     @Autowired
     private PlayerRepository playerRepository;
-
     @Autowired
     private PlayerService playerService;
     @Autowired
@@ -59,6 +58,9 @@ public class GameService {
     private final Map<String, Boolean> powerAvailable = new ConcurrentHashMap<>();
     // Jugador que tiene el poder activo por juego
     private final Map<String, String> powerOwner = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> healthLoops = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> powerLoops = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> syncLoops = new ConcurrentHashMap<>();
 
     public void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
@@ -112,32 +114,47 @@ public class GameService {
     }
 
     public void startGameLoop(String gameId) {
-        if (gameLoops.containsKey(gameId)) {
-            return; // Ya está corriendo
+
+        if (healthLoops.containsKey(gameId)) {
+            return;
         }
-        // hilo que reduce vida cada segundo
-        ScheduledFuture<?> loop = scheduler.scheduleAtFixedRate(() -> {
-            reduceHealthOverTime(gameId); // aplica daño a todos los jugadores de la partida
-        }, 0, 1, TimeUnit.SECONDS);
 
-        gameLoops.put(gameId, loop);
-        // hilo que activa poderes cada 30 segundos
-        scheduler.scheduleAtFixedRate(() -> {
-            activatePower(gameId);
-        }, 10, 10, TimeUnit.SECONDS);
+        // LOOP 1: vida por segundo
+        ScheduledFuture<?> hLoop = scheduler.scheduleAtFixedRate(
+                () -> reduceHealthOverTime(gameId),
+                0, 1, TimeUnit.SECONDS
+        );
+        healthLoops.put(gameId, hLoop);
 
-        // HILO 3: sincronizar memoria -> DB cada 2 segundos ---
-        scheduler.scheduleAtFixedRate(() -> {
-            syncPlayersToDB(gameId);
-        }, 0, 2, TimeUnit.SECONDS);
+        // LOOP 2: poderes
+        ScheduledFuture<?> pLoop = scheduler.scheduleAtFixedRate(
+                () -> activatePower(gameId),
+                10, 10, TimeUnit.SECONDS
+        );
+        powerLoops.put(gameId, pLoop);
 
+        // LOOP 3: sincronizar
+        ScheduledFuture<?> sLoop = scheduler.scheduleAtFixedRate(
+                () -> syncPlayersToDB(gameId),
+                0, 2, TimeUnit.SECONDS
+        );
+        syncLoops.put(gameId, sLoop);
     }
 
     public void stopGameLoop(String gameId) {
-        ScheduledFuture<?> loop = gameLoops.remove(gameId);
-        if (loop != null)
-            loop.cancel(true);
+
+        Optional.ofNullable(healthLoops.remove(gameId))
+                .ifPresent(f -> f.cancel(true));
+
+        Optional.ofNullable(powerLoops.remove(gameId))
+                .ifPresent(f -> f.cancel(true));
+
+        Optional.ofNullable(syncLoops.remove(gameId))
+                .ifPresent(f -> f.cancel(true));
+
+        System.out.println("⛔ Todos los loops detenidos para " + gameId);
     }
+
 
     public Player movePlayer(String gameId, String playerId, String direction) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
@@ -171,7 +188,8 @@ public class GameService {
                 player.getPositionX(),
                 player.getPositionY(),
                 player.getHealth(),
-                player.isAlive());
+                player.isAlive()
+        );
         template.convertAndSend("/topic/games/" + gameId + "/players", dto);
 
         eatenFood.ifPresent(food -> {
@@ -186,6 +204,7 @@ public class GameService {
         return player;
     }
 
+
     public void reduceHealthOverTime(String gameId) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
         if (gamePlayers == null)
@@ -194,7 +213,7 @@ public class GameService {
         for (Player player : gamePlayers.values()) {
             System.out.println("Reloj: " + player.getName() + " vida ↓ " + player.getHealth());
             if (player.isAlive()) {
-                player.setHealth(player.getHealth() - 5);
+                player.setHealth(player.getHealth() - 1);
                 if (player.getHealth() <= 0) {
                     player.setAlive(false); // aqui muere el jugador
                 }
@@ -210,6 +229,20 @@ public class GameService {
 
                 template.convertAndSend("/topic/games/" + gameId + "/players", dto);
             }
+        }
+
+        Optional<Long> remaining = getRemainingSeconds(gameId);
+        if (remaining.isPresent() && remaining.get() <= 0) {
+            endGame(gameId);
+            return;
+        }
+
+        long aliveCount = gamePlayers.values().stream()
+                .filter(Player::isAlive)
+                .count();
+
+        if (aliveCount <= 1) {
+            endGame(gameId);
         }
     }
 
@@ -236,12 +269,13 @@ public class GameService {
         }
         powerAvailable.put(gameId, false);
         powerOwner.put(gameId, playerId);
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "CLAIMED");
         payload.put("owner", playerId);
         payload.put("timestamp", Instant.now().toString());
+
         template.convertAndSend("/topic/games/" + gameId + "/power", payload);
-        usePower(gameId, playerId);
         System.out.println("⚡ Poder reclamado por jugador " + playerId + " en juego " + gameId);
     }
 
@@ -263,6 +297,7 @@ public class GameService {
         }
         powerOwner.remove(gameId);
         powerAvailable.put(gameId, false);
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "USED");
         payload.put("owner", playerId);
@@ -364,10 +399,11 @@ public class GameService {
         return gameRepository.findById(gameId).flatMap(g -> {
             boolean ok = g.addPlayerDinosaur(playerId, dinosaur);
             Player player = playerRepository.findById(playerId)
-                    .orElseThrow(() -> new RuntimeException("Player not found to add"));
-            ;
-            Game game = gameRepository.findById(gameId).get();
-            try {
+                    .orElseThrow(() -> new RuntimeException("Player no encontrado: " + playerId));
+
+            Game game = gameRepository.findById(gameId)
+                    .orElseThrow(() -> new RuntimeException("Game no encontrado: " + gameId));
+            try{
                 boardService.addPlayer(game.getBoardId(), player);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -402,7 +438,6 @@ public class GameService {
             return g.getRemainingSeconds();
         });
     }
-
     // Obtener el winner almacenado en el Game
     public Optional<Player> getWinner(String gameId) {
         return gameRepository.findById(gameId).map(Game::getWinner);
@@ -473,6 +508,33 @@ public class GameService {
                 System.out.println("Error sincronizando jugador " + p.getId() + ": " + e.getMessage());
             }
         }
+    }
+
+    public void endGame(String gameId) {
+        System.out.println("⚠ Finalizando partida " + gameId);
+
+        // 1. Detener todos los loops
+        stopGameLoop(gameId);
+
+        // 2. Obtener ganador
+        Optional<Player> winnerOpt = computeAndSetWinner(gameId);
+
+        Player winner = winnerOpt.orElse(null);
+
+        // 3. Notificar al front
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("event", "GAME_ENDED");
+        payload.put("winner", winner != null ? winner.getName() : null);
+        payload.put("winnerId", winner != null ? winner.getId() : null);
+
+        template.convertAndSend("/topic/games/" + gameId + "/events", payload);
+
+        // 4. Limpiar memoria
+        activePlayers.remove(gameId);
+        powerAvailable.remove(gameId);
+        powerOwner.remove(gameId);
+
+        System.out.println("✔ Partida " + gameId + " finalizada correctamente");
     }
 
 }
