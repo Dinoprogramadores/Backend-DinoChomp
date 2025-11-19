@@ -14,9 +14,8 @@ import lombok.*;
 public abstract class Power {
     @Id
     protected String name;
-    protected int duration; // en segundos
-    private String type; //health, speed, shield, etc.
+
 
     
-    public abstract void applyEffect(Player player);
+    public abstract Player applyEffect(Player player);
 }

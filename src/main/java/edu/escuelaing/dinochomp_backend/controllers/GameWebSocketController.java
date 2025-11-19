@@ -4,6 +4,9 @@ import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.services.GameService;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerMoveMessage;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerActivationtDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerRequestDTO;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -33,8 +36,8 @@ public class GameWebSocketController {
     }
 
     @MessageMapping("/games/{gameId}/power/claim")
-    public void claimPower(@DestinationVariable String gameId, String playerId) {
-        gameService.claimPower(gameId, playerId);
+    public void claimPower(@DestinationVariable String gameId, @Payload PowerActivationtDTO msg) {
+        gameService.claimPower(msg.getGameId(), msg.getPlayerId());
     }
 
     @MessageMapping("/games/{gameId}/power/use")
@@ -73,4 +76,6 @@ public class GameWebSocketController {
         }
         gameService.registerPlayer(gameId, player);
     }
+
+    
 }

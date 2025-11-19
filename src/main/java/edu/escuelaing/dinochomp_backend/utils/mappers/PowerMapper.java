@@ -13,27 +13,24 @@ public class PowerMapper {
     public Power toEntity(PowerRequestDTO dto) {
         if (dto == null) return null;
 
-        Power power;
-        switch (dto.getType().toLowerCase()) {
-            case "health":
-                power = new HealthPower();
-                break;
-            default:
-                throw new IllegalArgumentException("Tipo de poder desconocido: " + dto.getType());
+        // El único poder actual es HEALTH
+        if ("HEALTH".equalsIgnoreCase(dto.getName())) {
+            return new HealthPower(dto.getHealth());
         }
-        // Set atributos comunes del padre
-        power.setType(dto.getType());
-        power.setDuration(dto.getDuration());
-        power.setName(dto.getName());
-        return power;
+
+        throw new IllegalArgumentException("Tipo de poder desconocido: " + dto.getName());
     }
 
     public PowerResponseDTO toDTO(Power p) {
         if (p == null) return null;
-        return PowerResponseDTO.builder()
-                .type(p.getType())
-                .name(p.getName())
-                .duration(p.getDuration())
-                .build();
+
+        if (p instanceof HealthPower hp) {
+            return PowerResponseDTO.builder()
+                    .name("HEALTH")
+                    .health(hp.getAddedHealth())
+                    .build();
+        }
+
+        throw new IllegalArgumentException("Clase de poder desconocida: " + p.getClass());
     }
 }

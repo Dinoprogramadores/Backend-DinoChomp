@@ -46,6 +46,8 @@ public class GameService {
     private PlayerService playerService;
     @Autowired
     private BoardService boardService;
+    @Autowired
+    private PowerService powerService;
 
     // Map con todos los jugadores agrupados por ID de juego
     private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
@@ -72,11 +74,11 @@ public class GameService {
         int width = game.getWidth();
         int height = game.getHeight();
 
-        Point[] corners = new Point[]{
+        Point[] corners = new Point[] {
                 new Point(0, 0),
-                new Point(width-1, 0),
-                new Point(0, height-1),
-                new Point(width-1, height-1)
+                new Point(width - 1, 0),
+                new Point(0, height - 1),
+                new Point(width - 1, height - 1)
         };
 
         Set<String> occupied = players.values().stream()
@@ -85,7 +87,7 @@ public class GameService {
 
         Point spawn = null;
         for (Point p : corners) {
-            if (!occupied.contains(p.x + "," + p.y)){
+            if (!occupied.contains(p.x + "," + p.y)) {
                 spawn = p;
                 break;
             }
@@ -122,7 +124,13 @@ public class GameService {
         // hilo que activa poderes cada 30 segundos
         scheduler.scheduleAtFixedRate(() -> {
             activatePower(gameId);
-        }, 10, 30, TimeUnit.SECONDS);
+        }, 10, 10, TimeUnit.SECONDS);
+
+        // HILO 3: sincronizar memoria -> DB cada 2 segundos ---
+        scheduler.scheduleAtFixedRate(() -> {
+            syncPlayersToDB(gameId);
+        }, 0, 2, TimeUnit.SECONDS);
+
     }
 
     public void stopGameLoop(String gameId) {
@@ -133,11 +141,12 @@ public class GameService {
 
     public Player movePlayer(String gameId, String playerId, String direction) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
-        if (gamePlayers == null) return null;
+        if (gamePlayers == null)
+            return null;
 
         Player player = gamePlayers.get(playerId);
-        if (player == null || !player.isAlive()) return null;
-
+        if (player == null || !player.isAlive())
+            return null;
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new RuntimeException("No game found"));
 
@@ -162,8 +171,7 @@ public class GameService {
                 player.getPositionX(),
                 player.getPositionY(),
                 player.getHealth(),
-                player.isAlive()
-        );
+                player.isAlive());
         template.convertAndSend("/topic/games/" + gameId + "/players", dto);
 
         eatenFood.ifPresent(food -> {
@@ -178,18 +186,19 @@ public class GameService {
         return player;
     }
 
-
     public void reduceHealthOverTime(String gameId) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
         if (gamePlayers == null)
             return;
 
         for (Player player : gamePlayers.values()) {
+            System.out.println("Reloj: " + player.getName() + " vida ↓ " + player.getHealth());
             if (player.isAlive()) {
                 player.setHealth(player.getHealth() - 5);
                 if (player.getHealth() <= 0) {
-                    player.setAlive(false);
+                    player.setAlive(false); // aqui muere el jugador
                 }
+                playerRepository.save(player);
 
                 PlayerPositionDTO dto = new PlayerPositionDTO(
                         player.getId(),
@@ -208,7 +217,7 @@ public class GameService {
         if (Boolean.TRUE.equals(powerAvailable.get(gameId))) {
             return; // Ya hay un poder activo
         }
-        
+
         powerAvailable.put(gameId, true);
         powerOwner.remove(gameId);
 
@@ -221,20 +230,18 @@ public class GameService {
         System.out.println("⚡ Poder activado en juego " + gameId);
     }
 
-    public void claimPower(String gameId, String playerId) {
+    public synchronized void claimPower(String gameId, String playerId) {
         if (!Boolean.TRUE.equals(powerAvailable.get(gameId))) {
             return; // No hay poder disponible
         }
-
         powerAvailable.put(gameId, false);
         powerOwner.put(gameId, playerId);
-
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "CLAIMED");
         payload.put("owner", playerId);
         payload.put("timestamp", Instant.now().toString());
-
         template.convertAndSend("/topic/games/" + gameId + "/power", payload);
+        usePower(gameId, playerId);
         System.out.println("⚡ Poder reclamado por jugador " + playerId + " en juego " + gameId);
     }
 
@@ -244,12 +251,18 @@ public class GameService {
             System.out.println("🚫 Jugador " + playerId + " intentó usar un poder que no tiene");
             return;
         }
-        Player player = playerRepository.getPlayerById(playerId);
-        player.setHealth(player.getHealth() + 10);
-
+        Player player = playerRepository.findById(playerId)
+                .orElseThrow(() -> new RuntimeException("Player not found to apply the power"));
+        System.out.println("id que se envia al powerservice: " + player.getId());
+        // selecciona un poder de manera random
+        Player updatedPlayer = powerService.activateRandomPower(player);
+        // actualiza el hash de jugadores al aplicar el poder
+        Player inMemory = activePlayers.get(gameId).get(playerId);
+        if (inMemory != null) {
+            inMemory.setHealth(updatedPlayer.getHealth());
+        }
         powerOwner.remove(gameId);
         powerAvailable.put(gameId, false);
-
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "USED");
         payload.put("owner", playerId);
@@ -261,7 +274,8 @@ public class GameService {
 
     // Nuevo: crear juego y sembrar comida aleatoria según totalFood
     public Game createGame(Game game, int totalFood) {
-        if (game == null) throw new IllegalArgumentException("game required");
+        if (game == null)
+            throw new IllegalArgumentException("game required");
         System.out.println("getWidth: " + game.getWidth() + "getHeight: " + game.getHeight());
         Board board = boardService.createBoard(game.getWidth(), game.getHeight());
         game.setBoardId(board.getId());
@@ -278,7 +292,8 @@ public class GameService {
         int width = board.getWidth();
         int height = board.getHeight();
 
-        if (width <= 2 || height <= 2 || totalFood <= 0) return;
+        if (width <= 2 || height <= 2 || totalFood <= 0)
+            return;
 
         Random random = new Random();
         int placed = 0;
@@ -296,10 +311,12 @@ public class GameService {
                     || (x == 0 && y == height - 1)
                     || (x == width - 1 && y == 0)
                     || (x == width - 1 && y == height - 1);
-            if (isCorner) continue;
+            if (isCorner)
+                continue;
 
             Point p = new Point(x, y);
-            if (!board.isNull(p)) continue; // ya ocupado
+            if (!board.isNull(p))
+                continue; // ya ocupado
 
             // Crear y agregar el Food
             Food f = Food.builder()
@@ -346,9 +363,11 @@ public class GameService {
     public Optional<Game> addPlayerDinosaur(String gameId, String playerId, Dinosaur dinosaur) {
         return gameRepository.findById(gameId).flatMap(g -> {
             boolean ok = g.addPlayerDinosaur(playerId, dinosaur);
-            Player player = playerRepository.getPlayerById(playerId);
+            Player player = playerRepository.findById(playerId)
+                    .orElseThrow(() -> new RuntimeException("Player not found to add"));
+            ;
             Game game = gameRepository.findById(gameId).get();
-            try{
+            try {
                 boardService.addPlayer(game.getBoardId(), player);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -383,6 +402,7 @@ public class GameService {
             return g.getRemainingSeconds();
         });
     }
+
     // Obtener el winner almacenado en el Game
     public Optional<Player> getWinner(String gameId) {
         return gameRepository.findById(gameId).map(Game::getWinner);
@@ -391,7 +411,8 @@ public class GameService {
     // Calcular y establecer el winner según reglas, y retornar el ganador
     public Optional<Player> computeAndSetWinner(String gameId) {
         Optional<Game> optGame = gameRepository.findById(gameId);
-        if (optGame.isEmpty()) return Optional.empty();
+        if (optGame.isEmpty())
+            return Optional.empty();
         Game game = optGame.get();
 
         Map<String, Dinosaur> pdm = game.getPlayerDinosaurMap();
@@ -426,13 +447,32 @@ public class GameService {
     }
 
     private Player pickByHighestHealthThenFirst(List<Player> candidates) {
-        if (candidates.isEmpty()) return null;
+        if (candidates.isEmpty())
+            return null;
         int maxHealth = candidates.stream().mapToInt(Player::getHealth).max().orElse(Integer.MIN_VALUE);
         List<Player> maxes = candidates.stream()
                 .filter(p -> p.getHealth() == maxHealth)
                 .collect(Collectors.toList());
-        if (maxes.size() == 1) return maxes.get(0);
-        // Desempate: elegir el "primero" determinístico. Usamos id ascendente para consistencia.
+        if (maxes.size() == 1)
+            return maxes.get(0);
+        // Desempate: elegir el "primero" determinístico. Usamos id ascendente para
+        // consistencia.
         return maxes.stream().min(Comparator.comparing(Player::getId)).orElse(maxes.get(0));
     }
+
+    private void syncPlayersToDB(String gameId) {
+        Map<String, Player> players = activePlayers.get(gameId);
+        if (players == null)
+            return;
+
+        for (Player p : players.values()) {
+            try {
+                playerRepository.save(p); // guarda health, alive, posición, etc.
+                System.out.println("SYNC → DB: " + p.getName() + " vida=" + p.getHealth());
+            } catch (Exception e) {
+                System.out.println("Error sincronizando jugador " + p.getId() + ": " + e.getMessage());
+            }
+        }
+    }
+
 }

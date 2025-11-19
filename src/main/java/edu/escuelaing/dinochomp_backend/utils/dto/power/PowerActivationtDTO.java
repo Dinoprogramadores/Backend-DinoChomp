@@ -8,10 +8,9 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class PowerRequestDTO implements Serializable {
-    private String name;
-    private int health;
-    
+public class PowerActivationtDTO implements Serializable {
+    private String gameId;
+    private String playerId; 
 
 
 }
