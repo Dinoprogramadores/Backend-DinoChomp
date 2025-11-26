@@ -66,10 +66,8 @@ public class PowerService {
 
     // Activar un poder aleatorio para un jugador
     public Player activateRandomPower(Player player) {
-        System.out.println("poder random asignado a: "+player.getId());
         Power selectedPower = powerPool.get(random.nextInt(powerPool.size())).get();
         Player newPlayer = selectedPower.applyEffect(player);
-        System.out.println("id DEL NEWPLAYER "+newPlayer.getId());
         playerRepository.save(newPlayer);
         return newPlayer;
     }
