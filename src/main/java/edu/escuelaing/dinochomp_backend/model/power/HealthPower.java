@@ -7,17 +7,21 @@ import lombok.*;
 
 @Getter
 @Setter
-@AllArgsConstructor
-@NoArgsConstructor
 @Builder
-@Document(collection = "Dinosaur")
+@Document(collection = "Power")
 public class HealthPower extends Power {
     private int addedHealth;
 
+    public HealthPower(int addedHealth) {
+        this.addedHealth = addedHealth;
+        this.name = "HEALTH";
+    }
+
     @Override
-    public void applyEffect(Player player) {
-        int newHealth = Math.min(player.getHealth() + addedHealth, player.getHealth());
+    public Player applyEffect(Player player) {
+        int newHealth = Math.min(player.getHealth() + addedHealth, 100);
         player.setHealth(newHealth);
+        return player;
     }
     
     

@@ -4,6 +4,9 @@ import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.services.GameService;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerMoveMessage;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerActivationtDTO;
+import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerRequestDTO;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -32,6 +35,16 @@ public class GameWebSocketController {
         template.convertAndSend("/topic/games/" + gameId + "/status", "Game stopped!");
     }
 
+    @MessageMapping("/games/{gameId}/power/claim")
+    public void claimPower(@DestinationVariable String gameId, @Payload PowerActivationtDTO msg) {
+        gameService.claimPower(msg.getGameId(), msg.getPlayerId());
+    }
+
+    @MessageMapping("/games/{gameId}/power/use")
+    public void usePower(@DestinationVariable String gameId, String playerId) {
+        gameService.usePower(gameId, playerId);
+    }
+
     // Cliente envía a: /app/games/{gameId}/move
     @MessageMapping("/games/{gameId}/move")
     public void handleMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage msg) {
@@ -40,7 +53,7 @@ public class GameWebSocketController {
         }
         Player updated = gameService.movePlayer(gameId, msg.getPlayerId(), msg.getDirection());
         if (updated == null) {
-            System.out.println("⚠️ Movimiento inválido o jugador no encontrado"
+            System.out.println("Movimiento inválido o jugador no encontrado"
                     );
             return; // Evita el NPE
         }
@@ -59,9 +72,11 @@ public class GameWebSocketController {
     @MessageMapping("/games/{gameId}/join")
     public void joinGame(@DestinationVariable String gameId, @Payload Player player) {
         if (player == null || player.getId() == null) {
-        System.err.println("❌ Jugador inválido en join");
+        System.err.println("Jugador inválido en join");
         return;
         }
         gameService.registerPlayer(gameId, player);
     }
+
+    
 }

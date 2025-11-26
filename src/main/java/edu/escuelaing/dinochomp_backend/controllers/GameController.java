@@ -117,7 +117,7 @@ public class GameController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/{id}/winner/compute")
+    @GetMapping("/{id}/winner/compute")
     public ResponseEntity<Player> computeWinner(@PathVariable String id) {
         return gameService.computeAndSetWinner(id)
                 .map(ResponseEntity::ok)
