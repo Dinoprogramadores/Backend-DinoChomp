@@ -282,14 +282,14 @@ public class GameService {
         }
         powerAvailable.put(gameId, false);
         powerOwner.put(gameId, playerId);
-
+        usePower(gameId, playerId);
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "CLAIMED");
         payload.put("owner", playerId);
         payload.put("timestamp", Instant.now().toString());
 
         template.convertAndSend("/topic/games/" + gameId + "/power", payload);
-        System.out.println("⚡ Poder reclamado por jugador " + playerId + " en juego " + gameId);
+        System.out.println("Poder reclamado por jugador " + playerId + " en juego " + gameId);
     }
 
     public void usePower(String gameId, String playerId) {
@@ -451,6 +451,7 @@ public class GameService {
             return g.getRemainingSeconds();
         });
     }
+
     // Obtener el winner almacenado en el Game
     public Optional<Player> getWinner(String gameId) {
         return gameRepository.findById(gameId).map(Game::getWinner);
@@ -526,13 +527,8 @@ public class GameService {
     public void endGame(String gameId) {
         System.out.println("Finalizando partida " + gameId);
         Optional<Game> gameOpt = getGameById(gameId);
-        System.out.println(("GameOPT: " + gameOpt.toString()));
         Game game = gameOpt.get();
-        System.out.println("Game: " + game);
-        System.out.println("GanadorObj: " + game.getWinner().toString());
-        System.out.println("Ganador Nom: " + game.getWinner().getName());
         String winner = game.getWinner().getName();
-        System.out.println("Winner: " + winner);
         template.convertAndSend(
                 "/topic/games/" + gameId + "/events",
                 Map.of(

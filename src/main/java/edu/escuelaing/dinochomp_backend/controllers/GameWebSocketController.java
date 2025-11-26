@@ -44,6 +44,7 @@ public class GameWebSocketController {
     public void usePower(@DestinationVariable String gameId, String playerId) {
         gameService.usePower(gameId, playerId);
     }
+
     // Cliente envía a: /app/games/{gameId}/move
     @MessageMapping("/games/{gameId}/move")
     public void handleMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage msg) {
