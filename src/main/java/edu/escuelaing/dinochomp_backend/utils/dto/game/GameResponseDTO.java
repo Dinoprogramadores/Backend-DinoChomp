@@ -1,5 +1,6 @@
 package edu.escuelaing.dinochomp_backend.utils.dto.game;
 
+import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.enums.Power;
 import lombok.*;
@@ -54,4 +55,6 @@ public class GameResponseDTO {
      * Segundos restantes del juego.
      */
     private Long remainingSeconds;
+
+    private Player winner;
 }

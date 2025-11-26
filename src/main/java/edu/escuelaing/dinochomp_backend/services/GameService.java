@@ -50,7 +50,6 @@ public class GameService {
 
     // Map con todos los jugadores agrupados por ID de juego
     private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
-
     // Scheduler para reducir vida por segundo
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private final Map<String, ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
@@ -115,6 +114,12 @@ public class GameService {
 
     public void startGameLoop(String gameId) {
 
+        Map<String, Player> players = activePlayers.get(gameId);
+        if (players == null || players.size() < 2) {
+            System.out.println("⛔ No se puede iniciar partida con menos de 2 jugadores");
+            return;
+        }
+
         if (healthLoops.containsKey(gameId)) {
             return;
         }
@@ -122,7 +127,7 @@ public class GameService {
         // LOOP 1: vida por segundo
         ScheduledFuture<?> hLoop = scheduler.scheduleAtFixedRate(
                 () -> reduceHealthOverTime(gameId),
-                0, 1, TimeUnit.SECONDS
+                0, 2, TimeUnit.SECONDS
         );
         healthLoops.put(gameId, hLoop);
 
@@ -213,7 +218,7 @@ public class GameService {
         for (Player player : gamePlayers.values()) {
             System.out.println("Reloj: " + player.getName() + " vida ↓ " + player.getHealth());
             if (player.isAlive()) {
-                player.setHealth(player.getHealth() - 1);
+                player.setHealth(player.getHealth() - 5);
                 if (player.getHealth() <= 0) {
                     player.setAlive(false); // aqui muere el jugador
                 }
@@ -242,6 +247,14 @@ public class GameService {
                 .count();
 
         if (aliveCount <= 1) {
+            Player winner = gamePlayers.values().stream()
+                    .filter(Player::isAlive)
+                    .findFirst()
+                    .orElse(null);
+            Optional<Game> gameOpt = getGameById(gameId);
+            Game game = gameOpt.get();
+            game.setWinner(winner);
+            gameRepository.save(game);
             endGame(gameId);
         }
     }
@@ -511,30 +524,30 @@ public class GameService {
     }
 
     public void endGame(String gameId) {
-        System.out.println("⚠ Finalizando partida " + gameId);
+        System.out.println("Finalizando partida " + gameId);
+        Optional<Game> gameOpt = getGameById(gameId);
+        System.out.println(("GameOPT: " + gameOpt.toString()));
+        Game game = gameOpt.get();
+        System.out.println("Game: " + game);
+        System.out.println("GanadorObj: " + game.getWinner().toString());
+        System.out.println("Ganador Nom: " + game.getWinner().getName());
+        String winner = game.getWinner().getName();
+        System.out.println("Winner: " + winner);
+        template.convertAndSend(
+                "/topic/games/" + gameId + "/events",
+                Map.of(
+                        "event", "GAME_ENDED",
+                        "winner", winner
+                )
+        );
 
-        // 1. Detener todos los loops
         stopGameLoop(gameId);
 
-        // 2. Obtener ganador
-        Optional<Player> winnerOpt = computeAndSetWinner(gameId);
-
-        Player winner = winnerOpt.orElse(null);
-
-        // 3. Notificar al front
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("event", "GAME_ENDED");
-        payload.put("winner", winner != null ? winner.getName() : null);
-        payload.put("winnerId", winner != null ? winner.getId() : null);
-
-        template.convertAndSend("/topic/games/" + gameId + "/events", payload);
-
-        // 4. Limpiar memoria
         activePlayers.remove(gameId);
         powerAvailable.remove(gameId);
         powerOwner.remove(gameId);
 
-        System.out.println("✔ Partida " + gameId + " finalizada correctamente");
+        System.out.println("Partida " + gameId + " finalizada correctamente");
     }
 
 }
