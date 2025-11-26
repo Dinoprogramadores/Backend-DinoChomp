@@ -1,5 +1,4 @@
 name: Java CI with Maven + SonarCloud
-
 on:
   push:
     branches: [ "develop" ]
