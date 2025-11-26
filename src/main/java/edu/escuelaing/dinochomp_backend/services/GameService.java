@@ -52,7 +52,6 @@ public class GameService {
     private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
     // Scheduler para reducir vida por segundo
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
-    private final Map<String, ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
     // Poderes disponibles por juego
     private final Map<String, Boolean> powerAvailable = new ConcurrentHashMap<>();
     // Jugador que tiene el poder activo por juego
@@ -60,6 +59,8 @@ public class GameService {
     private final Map<String, ScheduledFuture<?>> healthLoops = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> powerLoops = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> syncLoops = new ConcurrentHashMap<>();
+    private Map<String, ScheduledFuture<?>> connectionWindows = new ConcurrentHashMap<>();
+    private final long CONNECTION_WINDOW_SECONDS = 10;
 
     public void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
@@ -114,12 +115,6 @@ public class GameService {
 
     public void startGameLoop(String gameId) {
 
-        Map<String, Player> players = activePlayers.get(gameId);
-        if (players == null || players.size() < 2) {
-            System.out.println("⛔ No se puede iniciar partida con menos de 2 jugadores");
-            return;
-        }
-
         if (healthLoops.containsKey(gameId)) {
             return;
         }
@@ -157,7 +152,7 @@ public class GameService {
         Optional.ofNullable(syncLoops.remove(gameId))
                 .ifPresent(f -> f.cancel(true));
 
-        System.out.println("⛔ Todos los loops detenidos para " + gameId);
+        System.out.println("Todos los loops detenidos para " + gameId);
     }
 
 
@@ -247,14 +242,8 @@ public class GameService {
                 .count();
 
         if (aliveCount <= 1) {
-            Player winner = gamePlayers.values().stream()
-                    .filter(Player::isAlive)
-                    .findFirst()
-                    .orElse(null);
-            Optional<Game> gameOpt = getGameById(gameId);
-            Game game = gameOpt.get();
-            game.setWinner(winner);
-            gameRepository.save(game);
+            System.out.println("⚰Jugadores vivos: " + aliveCount);
+            computeAndSetWinner(gameId);
             endGame(gameId);
         }
     }
@@ -295,7 +284,7 @@ public class GameService {
     public void usePower(String gameId, String playerId) {
         String currentOwner = powerOwner.get(gameId);
         if (!playerId.equals(currentOwner)) {
-            System.out.println("🚫 Jugador " + playerId + " intentó usar un poder que no tiene");
+            System.out.println("Jugador " + playerId + " intentó usar un poder que no tiene");
             return;
         }
         Player player = playerRepository.findById(playerId)
@@ -317,23 +306,49 @@ public class GameService {
         payload.put("timestamp", Instant.now().toString());
 
         template.convertAndSend("/topic/games/" + gameId + "/power", payload);
-        System.out.println("💥 Poder usado por " + playerId + " en juego " + gameId);
+        System.out.println("Poder usado por " + playerId + " en juego " + gameId);
     }
 
     // Nuevo: crear juego y sembrar comida aleatoria según totalFood
     public Game createGame(Game game, int totalFood) {
         if (game == null)
             throw new IllegalArgumentException("game required");
-        System.out.println("getWidth: " + game.getWidth() + "getHeight: " + game.getHeight());
         Board board = boardService.createBoard(game.getWidth(), game.getHeight());
         game.setBoardId(board.getId());
-        System.out.println("Partida: " + game.getNombre() + "Tablero: " + game.getBoardId());
         if (totalFood > 0) {
             seedFood(board, totalFood);
         }
-        System.out.println("DEBUG MAP: " + game.getPlayerDinosaurMap());
         boardRepository.save(BoardMapper.toDocument(board));
-        return gameRepository.save(game);
+        Game saved = gameRepository.save(game);
+
+        openConnectionWindow(saved.getNombre());
+
+        return saved;
+    }
+
+    public void openConnectionWindow(String gameId) {
+        ScheduledFuture<?> timer = scheduler.schedule(() -> {
+            handleConnectionWindowEnd(gameId);
+        }, CONNECTION_WINDOW_SECONDS, TimeUnit.SECONDS);
+
+        connectionWindows.put(gameId, timer);
+        System.out.println("Ventana de conexión abierta para " + gameId);
+    }
+
+    private void handleConnectionWindowEnd(String gameId) {
+        Map<String, Player> players = activePlayers.get(gameId);
+
+        int count = (players != null) ? players.size() : 0;
+
+        if (count >= 2) {
+            System.out.println("Jugadores suficientes → Iniciando partida " + gameId);
+            startGameLoop(gameId);
+        } else {
+            System.out.println("No llegaron suficientes jugadores → No se inicia " + gameId);
+            stopGameLoop(gameId);
+        }
+
+        connectionWindows.remove(gameId);
     }
 
     private void seedFood(Board board, int totalFood) {
@@ -483,7 +498,7 @@ public class GameService {
         List<Player> alive = playersInGame.stream().filter(Player::isAlive).collect(Collectors.toList());
         Player winner;
         if (alive.size() == 1) {
-            winner = alive.get(0);
+            winner = alive.getFirst();
         } else if (alive.size() > 1) {
             winner = pickByHighestHealthThenFirst(alive);
         } else { // nadie vivo: elegir por mayor health entre todos
