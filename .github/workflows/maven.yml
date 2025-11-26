@@ -32,7 +32,7 @@ jobs:
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       run: |
-        mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:5.3.0.6276:sonar \
+        mvn -B verify -U org.sonarsource.scanner.maven:sonar-maven-plugin:5.3.0.6276:sonar \
           -Dsonar.organization=dinoprogramadores \
           -Dsonar.projectKey=Dinoprogramadores_Backend-DinoChomp \
           -Dsonar.host.url=https://sonarcloud.io
