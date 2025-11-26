@@ -2,12 +2,15 @@ package edu.escuelaing.dinochomp_backend.services;
 
 import edu.escuelaing.dinochomp_backend.model.board.Board;
 import edu.escuelaing.dinochomp_backend.model.board.BoardDocument;
+import edu.escuelaing.dinochomp_backend.model.board.BoardItem;
 import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.repository.BoardRepository;
 import edu.escuelaing.dinochomp_backend.repository.FoodRepository;
+import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.utils.mappers.BoardMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.awt.Point;
@@ -20,6 +23,12 @@ public class BoardService {
 
     private final BoardRepository boardRepository;
     private final FoodRepository foodRepository;
+    private final PlayerRepository playerRepository;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    private String boardKey(String boardId) {
+        return "board:" + boardId + ":cells";
+    }
 
     public Board createBoard(int width, int height) {
         Board board = new Board(width, height);
@@ -27,57 +36,108 @@ public class BoardService {
         BoardDocument document = BoardMapper.toDocument(board);
         document = boardRepository.save(document);
 
+        String key = boardKey(document.getId());
+        // Inicializa todas las celdas como vacías usando "EMPTY" en lugar de null
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                redisTemplate.opsForHash().put(key, x + "," + y, "EMPTY");
+            }
+        }
+
         return BoardMapper.fromDocument(document);
     }
 
     public Optional<Board> getBoard(String boardId) {
-        return boardRepository.findById(boardId)
-                .map(BoardMapper::fromDocument);
+        return boardRepository.findById(boardId).map(doc -> {
+            Board board = BoardMapper.fromDocument(doc);
+
+            String key = boardKey(boardId);
+            Map<Object, Object> redisMap = redisTemplate.opsForHash().entries(key);
+
+            Map<Point, BoardItem> map = board.getMap();
+            map.clear();
+
+            redisMap.forEach((k, v) -> {
+                String[] parts = k.toString().split(",");
+                int x = Integer.parseInt(parts[0]);
+                int y = Integer.parseInt(parts[1]);
+                Point point = new Point(x, y);
+
+                BoardItem item = null;
+
+                if (v == null || "EMPTY".equals(v.toString())) {
+                    item = null;
+
+                } else if (v.toString().startsWith("FOOD:")) {
+                    String foodId = v.toString().substring(5);
+                    item = foodRepository.findById(foodId).orElse(null);
+
+                } else if (v.toString().startsWith("PLAYER:")) {
+                    String playerId = v.toString().substring(7);
+                    item = playerRepository.findById(playerId).orElse(null);
+                }
+
+                map.put(point, item);
+            });
+
+            return board;
+        });
     }
 
     public Board addPlayer(String boardId, Player player) {
-        Board board = getBoard(boardId)
+        // Primero guardar el jugador en su repositorio
+        playerRepository.save(player);
+
+        String key = boardKey(boardId);
+        String cell = player.getPositionX() + "," + player.getPositionY();
+
+        redisTemplate.opsForHash().put(key, cell, "PLAYER:" + player.getId());
+
+        return getBoard(boardId)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
-
-        Point position = new Point(player.getPositionX(), player.getPositionY());
-        board.getMap().put(position, player);
-
-        BoardDocument doc = BoardMapper.toDocument(board);
-        boardRepository.save(doc);
-
-        return board;
     }
 
     public Board addFood(String boardId, Food food) {
-        Board board = getBoard(boardId)
+        // Guardar la comida en su repositorio
+        foodRepository.save(food);
+
+        String key = boardKey(boardId);
+        String cell = food.getPositionX() + "," + food.getPositionY();
+
+        redisTemplate.opsForHash().put(key, cell, "FOOD:" + food.getId());
+
+        return getBoard(boardId)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
-
-        Point position = new Point(food.getPositionX(), food.getPositionY());
-        board.getMap().put(position, food);
-
-        BoardDocument doc = BoardMapper.toDocument(board);
-        boardRepository.save(doc);
-
-        return board;
     }
 
     public Optional<Food> movePlayer(String boardId, Player player, int newX, int newY) {
-        Board board = getBoard(boardId)
-                .orElseThrow(() -> new RuntimeException("Board not found"));
-        Food eatenFood = null;
-        Object itemAtDest = board.getMap().get(new Point(newX, newY));
+        String key = boardKey(boardId);
 
-        if (itemAtDest instanceof Food food) {
-            eatenFood = food;
+        String origin = player.getPositionX() + "," + player.getPositionY();
+        String dest = newX + "," + newY;
+
+        Object itemAtDest = redisTemplate.opsForHash().get(key, dest);
+        Food eaten = null;
+
+        // Verificar si hay comida en el destino
+        if (itemAtDest instanceof String id && id.startsWith("FOOD:")) {
+            String foodId = id.replace("FOOD:", "");
+            eaten = foodRepository.findById(foodId).orElse(null);
+            foodRepository.deleteById(foodId);
         }
-        board.movePlayer(player, newX, newY);
-        BoardDocument doc = BoardMapper.toDocument(board);
-        boardRepository.save(doc);
-        if (eatenFood != null) {
-            foodRepository.deleteById(eatenFood.getId());
-        }
-        return Optional.ofNullable(eatenFood);
+
+        // Limpiar la posición origen
+        redisTemplate.opsForHash().put(key, origin, "EMPTY");
+
+        // Mover al jugador a la nueva posición
+        redisTemplate.opsForHash().put(key, dest, "PLAYER:" + player.getId());
+
+        // Actualizar la posición del jugador en su entidad y guardarlo
+        player.setPositionX(newX);
+        player.setPositionY(newY);
+        playerRepository.save(player);
+
+        return Optional.ofNullable(eaten);
     }
-
 
 }

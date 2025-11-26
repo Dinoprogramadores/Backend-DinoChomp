@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class GameService {
-    // send messages to the socket
     @Autowired
     private SimpMessagingTemplate template;
 
@@ -41,7 +40,6 @@ public class GameService {
     private BoardRepository boardRepository;
     @Autowired
     private PlayerRepository playerRepository;
-
     @Autowired
     private PlayerService playerService;
     @Autowired
@@ -49,23 +47,21 @@ public class GameService {
     @Autowired
     private PowerService powerService;
 
-    // Map con todos los jugadores agrupados por ID de juego
     private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
-
-    // Scheduler para reducir vida por segundo
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
-    private final Map<String, ScheduledFuture<?>> gameLoops = new ConcurrentHashMap<>();
-    // Poderes disponibles por juego
     private final Map<String, Boolean> powerAvailable = new ConcurrentHashMap<>();
-    // Jugador que tiene el poder activo por juego
     private final Map<String, String> powerOwner = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> healthLoops = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> powerLoops = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> syncLoops = new ConcurrentHashMap<>();
+    private Map<String, ScheduledFuture<?>> connectionWindows = new ConcurrentHashMap<>();
+    private final long CONNECTION_WINDOW_SECONDS = 10;
 
     public void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
             throw new RuntimeException("Player inválido");
         }
 
-        // Si no existe el mapa del juego, lo crea
         activePlayers.putIfAbsent(gameId, new ConcurrentHashMap<>());
         Map<String, Player> players = activePlayers.get(gameId);
 
@@ -95,11 +91,14 @@ public class GameService {
 
         player.setPositionX(spawn.x);
         player.setPositionY(spawn.y);
+
+        // Guardar en DB antes de agregar a memoria
+        playerRepository.save(player);
+
         players.put(player.getId(), player);
 
         System.out.println("Jugador " + player.getId() + " agregado a activePlayers del juego " + gameId);
 
-        // Notifica a todos los jugadores conectados al juego
         PlayerPositionDTO dto = new PlayerPositionDTO(
                 player.getId(),
                 player.getName(),
@@ -112,31 +111,41 @@ public class GameService {
     }
 
     public void startGameLoop(String gameId) {
-        if (gameLoops.containsKey(gameId)) {
-            return; // Ya está corriendo
+        if (healthLoops.containsKey(gameId)) {
+            return;
         }
-        // hilo que reduce vida cada segundo
-        ScheduledFuture<?> loop = scheduler.scheduleAtFixedRate(() -> {
-            reduceHealthOverTime(gameId); // aplica daño a todos los jugadores de la partida
-        }, 0, 1, TimeUnit.SECONDS);
 
-        gameLoops.put(gameId, loop);
-        // hilo que activa poderes cada 30 segundos
-        scheduler.scheduleAtFixedRate(() -> {
-            activatePower(gameId);
-        }, 10, 10, TimeUnit.SECONDS);
+        // LOOP 1: vida por segundo
+        ScheduledFuture<?> hLoop = scheduler.scheduleAtFixedRate(
+                () -> reduceHealthOverTime(gameId),
+                0, 2, TimeUnit.SECONDS
+        );
+        healthLoops.put(gameId, hLoop);
 
-        // HILO 3: sincronizar memoria -> DB cada 2 segundos ---
-        scheduler.scheduleAtFixedRate(() -> {
-            syncPlayersToDB(gameId);
-        }, 0, 2, TimeUnit.SECONDS);
+        // LOOP 2: poderes
+        ScheduledFuture<?> pLoop = scheduler.scheduleAtFixedRate(
+                () -> activatePower(gameId),
+                10, 10, TimeUnit.SECONDS
+        );
+        powerLoops.put(gameId, pLoop);
 
+        // LOOP 3: sincronizar
+        ScheduledFuture<?> sLoop = scheduler.scheduleAtFixedRate(
+                () -> syncPlayersToDB(gameId),
+                0, 2, TimeUnit.SECONDS
+        );
+        syncLoops.put(gameId, sLoop);
     }
 
     public void stopGameLoop(String gameId) {
-        ScheduledFuture<?> loop = gameLoops.remove(gameId);
-        if (loop != null)
-            loop.cancel(true);
+        Optional.ofNullable(healthLoops.remove(gameId))
+                .ifPresent(f -> f.cancel(true));
+
+        Optional.ofNullable(powerLoops.remove(gameId))
+                .ifPresent(f -> f.cancel(true));
+
+        Optional.ofNullable(syncLoops.remove(gameId))
+                .ifPresent(f -> f.cancel(true));
     }
 
     public Player movePlayer(String gameId, String playerId, String direction) {
@@ -147,6 +156,7 @@ public class GameService {
         Player player = gamePlayers.get(playerId);
         if (player == null || !player.isAlive())
             return null;
+
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new RuntimeException("No game found"));
 
@@ -163,18 +173,17 @@ public class GameService {
             case "RIGHT" -> newX = Math.min(width - 1, newX + 1);
         }
 
+        // Mover en Redis y obtener comida si la hay
         Optional<Food> eatenFood = boardService.movePlayer(game.getBoardId(), player, newX, newY);
 
-        PlayerPositionDTO dto = new PlayerPositionDTO(
-                player.getId(),
-                player.getName(),
-                player.getPositionX(),
-                player.getPositionY(),
-                player.getHealth(),
-                player.isAlive());
-        template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+        // CRÍTICO: Actualizar la posición en memoria también
+        player.setPositionX(newX);
+        player.setPositionY(newY);
 
+        // Si comió, aumentar salud
         eatenFood.ifPresent(food -> {
+            player.setHealth(player.getHealth() + food.getNutritionValue());
+
             Map<String, Object> foodEvent = new HashMap<>();
             foodEvent.put("action", "FOOD_REMOVED");
             foodEvent.put("id", food.getId());
@@ -182,6 +191,16 @@ public class GameService {
             foodEvent.put("y", food.getPositionY());
             template.convertAndSend("/topic/games/" + gameId + "/food", foodEvent);
         });
+
+        PlayerPositionDTO dto = new PlayerPositionDTO(
+                player.getId(),
+                player.getName(),
+                player.getPositionX(),
+                player.getPositionY(),
+                player.getHealth(),
+                player.isAlive()
+        );
+        template.convertAndSend("/topic/games/" + gameId + "/players", dto);
 
         return player;
     }
@@ -192,13 +211,11 @@ public class GameService {
             return;
 
         for (Player player : gamePlayers.values()) {
-            System.out.println("Reloj: " + player.getName() + " vida ↓ " + player.getHealth());
             if (player.isAlive()) {
                 player.setHealth(player.getHealth() - 5);
                 if (player.getHealth() <= 0) {
-                    player.setAlive(false); // aqui muere el jugador
+                    player.setAlive(false);
                 }
-                playerRepository.save(player);
 
                 PlayerPositionDTO dto = new PlayerPositionDTO(
                         player.getId(),
@@ -211,11 +228,26 @@ public class GameService {
                 template.convertAndSend("/topic/games/" + gameId + "/players", dto);
             }
         }
+
+        Optional<Long> remaining = getRemainingSeconds(gameId);
+        if (remaining.isPresent() && remaining.get() <= 0) {
+            endGame(gameId);
+            return;
+        }
+
+        long aliveCount = gamePlayers.values().stream()
+                .filter(Player::isAlive)
+                .count();
+
+        if (aliveCount <= 1) {
+            computeAndSetWinner(gameId);
+            endGame(gameId);
+        }
     }
 
     public void activatePower(String gameId) {
         if (Boolean.TRUE.equals(powerAvailable.get(gameId))) {
-            return; // Ya hay un poder activo
+            return;
         }
 
         powerAvailable.put(gameId, true);
@@ -227,78 +259,107 @@ public class GameService {
         payload.put("timestamp", Instant.now().toString());
 
         template.convertAndSend("/topic/games/" + gameId + "/power", payload);
-        System.out.println("⚡ Poder activado en juego " + gameId);
     }
 
     public synchronized void claimPower(String gameId, String playerId) {
         if (!Boolean.TRUE.equals(powerAvailable.get(gameId))) {
-            return; // No hay poder disponible
+            return;
         }
         powerAvailable.put(gameId, false);
         powerOwner.put(gameId, playerId);
+        usePower(gameId, playerId);
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "CLAIMED");
         payload.put("owner", playerId);
         payload.put("timestamp", Instant.now().toString());
+
         template.convertAndSend("/topic/games/" + gameId + "/power", payload);
-        usePower(gameId, playerId);
-        System.out.println("⚡ Poder reclamado por jugador " + playerId + " en juego " + gameId);
     }
 
     public void usePower(String gameId, String playerId) {
         String currentOwner = powerOwner.get(gameId);
         if (!playerId.equals(currentOwner)) {
-            System.out.println("🚫 Jugador " + playerId + " intentó usar un poder que no tiene");
+            System.out.println("Jugador " + playerId + " intentó usar un poder que no tiene");
             return;
         }
+
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new RuntimeException("Player not found to apply the power"));
-        System.out.println("id que se envia al powerservice: " + player.getId());
-        // selecciona un poder de manera random
+
         Player updatedPlayer = powerService.activateRandomPower(player);
-        // actualiza el hash de jugadores al aplicar el poder
+
+        // Actualizar en memoria
         Player inMemory = activePlayers.get(gameId).get(playerId);
         if (inMemory != null) {
             inMemory.setHealth(updatedPlayer.getHealth());
         }
+
         powerOwner.remove(gameId);
         powerAvailable.put(gameId, false);
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "USED");
         payload.put("owner", playerId);
         payload.put("timestamp", Instant.now().toString());
 
         template.convertAndSend("/topic/games/" + gameId + "/power", payload);
-        System.out.println("💥 Poder usado por " + playerId + " en juego " + gameId);
     }
 
-    // Nuevo: crear juego y sembrar comida aleatoria según totalFood
     public Game createGame(Game game, int totalFood) {
         if (game == null)
             throw new IllegalArgumentException("game required");
-        System.out.println("getWidth: " + game.getWidth() + "getHeight: " + game.getHeight());
+
         Board board = boardService.createBoard(game.getWidth(), game.getHeight());
         game.setBoardId(board.getId());
-        System.out.println("Partida: " + game.getNombre() + "Tablero: " + game.getBoardId());
+
         if (totalFood > 0) {
-            seedFood(board, totalFood);
+            seedFood(game.getBoardId(), game.getWidth(), game.getHeight(), totalFood);
         }
-        System.out.println("DEBUG MAP: " + game.getPlayerDinosaurMap());
-        boardRepository.save(BoardMapper.toDocument(board));
-        return gameRepository.save(game);
+
+        Game saved = gameRepository.save(game);
+        openConnectionWindow(saved.getNombre());
+
+        return saved;
     }
 
-    private void seedFood(Board board, int totalFood) {
-        int width = board.getWidth();
-        int height = board.getHeight();
+    public void openConnectionWindow(String gameId) {
+        ScheduledFuture<?> timer = scheduler.schedule(() -> {
+            handleConnectionWindowEnd(gameId);
+        }, CONNECTION_WINDOW_SECONDS, TimeUnit.SECONDS);
 
+        connectionWindows.put(gameId, timer);
+    }
+
+    private void handleConnectionWindowEnd(String gameId) {
+        Map<String, Player> players = activePlayers.get(gameId);
+        int count = (players != null) ? players.size() : 0;
+
+        if (count >= 2) {
+            startGameLoop(gameId);
+        } else {
+            stopGameLoop(gameId);
+        }
+
+        connectionWindows.remove(gameId);
+    }
+
+    // CORREGIDO: seedFood ahora trabaja directamente con BoardService
+    private void seedFood(String boardId, int width, int height, int totalFood) {
         if (width <= 2 || height <= 2 || totalFood <= 0)
             return;
 
         Random random = new Random();
         int placed = 0;
-        int maxAttempts = totalFood * 5; // evita bucles infinitos si el tablero está lleno
+        int maxAttempts = totalFood * 5;
         int attempts = 0;
+
+        // Obtener el board actual para verificar posiciones ocupadas
+        Optional<Board> boardOpt = boardService.getBoard(boardId);
+        if (boardOpt.isEmpty()) {
+            throw new RuntimeException("Board not found: " + boardId);
+        }
+        Board board = boardOpt.get();
 
         while (placed < totalFood && attempts < maxAttempts) {
             attempts++;
@@ -315,10 +376,12 @@ public class GameService {
                 continue;
 
             Point p = new Point(x, y);
-            if (!board.isNull(p))
-                continue; // ya ocupado
 
-            // Crear y agregar el Food
+            // Verificar si está ocupado
+            if (!board.isNull(p))
+                continue;
+
+            // Crear Food
             Food f = Food.builder()
                     .name("pollo")
                     .positionX(x)
@@ -326,8 +389,12 @@ public class GameService {
                     .nutritionValue(10)
                     .build();
 
-            board.addFood(f);
-            foodRepository.save(f);
+            // Agregar usando BoardService (guarda en Redis y DB)
+            boardService.addFood(boardId, f);
+
+            // Actualizar el board local para las próximas iteraciones
+            board.getMap().put(p, f);
+
             placed++;
         }
     }
@@ -363,19 +430,28 @@ public class GameService {
     public Optional<Game> addPlayerDinosaur(String gameId, String playerId, Dinosaur dinosaur) {
         return gameRepository.findById(gameId).flatMap(g -> {
             boolean ok = g.addPlayerDinosaur(playerId, dinosaur);
-            Player player = playerRepository.findById(playerId)
-                    .orElseThrow(() -> new RuntimeException("Player not found to add"));
-            ;
-            Game game = gameRepository.findById(gameId).get();
-            try {
-                boardService.addPlayer(game.getBoardId(), player);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
 
             if (!ok) {
                 return Optional.empty();
             }
+
+            // IMPORTANTE: Primero buscar/guardar el Player en DB
+            Player player = playerRepository.findById(playerId)
+                    .orElseThrow(() -> new RuntimeException("Player no encontrado: " + playerId));
+
+            // Asegurar que el player esté guardado con su posición actual
+            playerRepository.save(player);
+
+            Game game = gameRepository.findById(gameId)
+                    .orElseThrow(() -> new RuntimeException("Game no encontrado: " + gameId));
+
+            try {
+                // Ahora sí agregar al board (Redis + DB)
+                boardService.addPlayer(game.getBoardId(), player);
+            } catch (Exception e) {
+                throw new RuntimeException("Error agregando player al board: " + e.getMessage(), e);
+            }
+
             return Optional.of(gameRepository.save(g));
         });
     }
@@ -403,12 +479,10 @@ public class GameService {
         });
     }
 
-    // Obtener el winner almacenado en el Game
     public Optional<Player> getWinner(String gameId) {
         return gameRepository.findById(gameId).map(Game::getWinner);
     }
 
-    // Calcular y establecer el winner según reglas, y retornar el ganador
     public Optional<Player> computeAndSetWinner(String gameId) {
         Optional<Game> optGame = gameRepository.findById(gameId);
         if (optGame.isEmpty())
@@ -423,7 +497,6 @@ public class GameService {
         }
 
         Set<String> playerIds = pdm.keySet();
-        // findAllById devuelve Iterable, lo convertimos a lista
         List<Player> playersInGame = new ArrayList<>(playerRepository.findAllById(playerIds));
         if (playersInGame.isEmpty()) {
             game.setWinner(null);
@@ -431,13 +504,16 @@ public class GameService {
             return Optional.empty();
         }
 
-        List<Player> alive = playersInGame.stream().filter(Player::isAlive).collect(Collectors.toList());
+        List<Player> alive = playersInGame.stream()
+                .filter(Player::isAlive)
+                .collect(Collectors.toList());
+
         Player winner;
         if (alive.size() == 1) {
             winner = alive.get(0);
         } else if (alive.size() > 1) {
             winner = pickByHighestHealthThenFirst(alive);
-        } else { // nadie vivo: elegir por mayor health entre todos
+        } else {
             winner = pickByHighestHealthThenFirst(playersInGame);
         }
 
@@ -449,15 +525,22 @@ public class GameService {
     private Player pickByHighestHealthThenFirst(List<Player> candidates) {
         if (candidates.isEmpty())
             return null;
-        int maxHealth = candidates.stream().mapToInt(Player::getHealth).max().orElse(Integer.MIN_VALUE);
+
+        int maxHealth = candidates.stream()
+                .mapToInt(Player::getHealth)
+                .max()
+                .orElse(Integer.MIN_VALUE);
+
         List<Player> maxes = candidates.stream()
                 .filter(p -> p.getHealth() == maxHealth)
                 .collect(Collectors.toList());
+
         if (maxes.size() == 1)
             return maxes.get(0);
-        // Desempate: elegir el "primero" determinístico. Usamos id ascendente para
-        // consistencia.
-        return maxes.stream().min(Comparator.comparing(Player::getId)).orElse(maxes.get(0));
+
+        return maxes.stream()
+                .min(Comparator.comparing(Player::getId))
+                .orElse(maxes.get(0));
     }
 
     private void syncPlayersToDB(String gameId) {
@@ -467,12 +550,36 @@ public class GameService {
 
         for (Player p : players.values()) {
             try {
-                playerRepository.save(p); // guarda health, alive, posición, etc.
-                System.out.println("SYNC → DB: " + p.getName() + " vida=" + p.getHealth());
+                playerRepository.save(p);
             } catch (Exception e) {
                 System.out.println("Error sincronizando jugador " + p.getId() + ": " + e.getMessage());
             }
         }
     }
 
+    public void endGame(String gameId) {
+        Optional<Game> gameOpt = getGameById(gameId);
+        if (gameOpt.isEmpty()) {
+            return;
+        }
+
+        Game game = gameOpt.get();
+        String winner = (game.getWinner() != null) ? game.getWinner().getName() : "Ninguno";
+
+        template.convertAndSend(
+                "/topic/games/" + gameId + "/events",
+                Map.of(
+                        "event", "GAME_ENDED",
+                        "winner", winner
+                )
+        );
+
+        stopGameLoop(gameId);
+
+        activePlayers.remove(gameId);
+        powerAvailable.remove(gameId);
+        powerOwner.remove(gameId);
+
+        System.out.println("Partida " + gameId + " finalizada correctamente");
+    }
 }

@@ -49,6 +49,7 @@ public class GameMapper {
                 .startTime(g.getStartTime())
                 .timerActive(g.isTimerActive())
                 .remainingSeconds(g.getRemainingSeconds())
+                .winner(g.getWinner())
                 .build();
     }
 
