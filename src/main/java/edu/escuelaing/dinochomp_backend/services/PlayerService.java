@@ -3,6 +3,7 @@ package edu.escuelaing.dinochomp_backend.services;
 import java.util.List;
 import java.util.Optional;
 
+import org.apache.commons.lang3.concurrent.UncheckedFuture;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -51,4 +52,7 @@ public class PlayerService {
         return playerRepository.findAll();
     }
 
+    public Optional<Player> getPlayerByEmail(String email) {
+        return playerRepository.findByEmail(email);
+    }
 }
