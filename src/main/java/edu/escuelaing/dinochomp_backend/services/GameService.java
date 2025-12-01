@@ -108,6 +108,32 @@ public class GameService {
                 player.isAlive());
 
         template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+
+        // NUEVO: Enviar estado actual del poder al jugador que se acaba de unir
+        syncPowerStateToPlayer(gameId);
+    }
+
+    private void syncPowerStateToPlayer(String gameId) {
+        Boolean isPowerAvailable = powerAvailable.get(gameId);
+        String currentOwner = powerOwner.get(gameId);
+
+        String status;
+        if (Boolean.TRUE.equals(isPowerAvailable)) {
+            status = "AVAILABLE";
+        } else if (currentOwner != null) {
+            status = "CLAIMED";
+        } else {
+            status = "UNAVAILABLE";
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("status", status);
+        payload.put("owner", currentOwner);
+        payload.put("timestamp", Instant.now().toString());
+
+        template.convertAndSend("/topic/games/" + gameId + "/power", payload);
+
+        System.out.println("Estado del poder sincronizado para juego " + gameId + ": " + status);
     }
 
     public void startGameLoop(String gameId) {
