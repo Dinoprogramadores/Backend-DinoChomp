@@ -57,7 +57,7 @@ public class GameService {
     private Map<String, ScheduledFuture<?>> connectionWindows = new ConcurrentHashMap<>();
     private final long CONNECTION_WINDOW_SECONDS = 10;
 
-    public void registerPlayer(String gameId, Player player) {
+    public synchronized void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
             throw new RuntimeException("Player inválido");
         }
@@ -89,15 +89,17 @@ public class GameService {
             }
         }
 
+        if (spawn == null) {
+            throw new RuntimeException("No hay esquinas disponibles para " + player.getId());
+        }
+
         player.setPositionX(spawn.x);
         player.setPositionY(spawn.y);
 
-        // Guardar en DB antes de agregar a memoria
         playerRepository.save(player);
-
         players.put(player.getId(), player);
 
-        System.out.println("Jugador " + player.getId() + " agregado a activePlayers del juego " + gameId);
+        System.out.println("Jugador " + player.getId() + " agregado en esquina (" + spawn.x + "," + spawn.y + ")");
 
         PlayerPositionDTO dto = new PlayerPositionDTO(
                 player.getId(),
@@ -108,10 +110,9 @@ public class GameService {
                 player.isAlive());
 
         template.convertAndSend("/topic/games/" + gameId + "/players", dto);
-
-        // NUEVO: Enviar estado actual del poder al jugador que se acaba de unir
         syncPowerStateToPlayer(gameId);
     }
+
 
     private void syncPowerStateToPlayer(String gameId) {
         Boolean isPowerAvailable = powerAvailable.get(gameId);
