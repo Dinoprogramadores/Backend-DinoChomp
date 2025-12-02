@@ -5,13 +5,10 @@ import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.model.game.Game;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
-import edu.escuelaing.dinochomp_backend.repository.BoardRepository;
-import edu.escuelaing.dinochomp_backend.repository.FoodRepository;
 import edu.escuelaing.dinochomp_backend.repository.GameRepository;
 import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 
-import edu.escuelaing.dinochomp_backend.utils.mappers.BoardMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -31,17 +28,10 @@ import java.util.stream.Collectors;
 public class GameService {
     @Autowired
     private SimpMessagingTemplate template;
-
     @Autowired
     private GameRepository gameRepository;
     @Autowired
-    private FoodRepository foodRepository;
-    @Autowired
-    private BoardRepository boardRepository;
-    @Autowired
     private PlayerRepository playerRepository;
-    @Autowired
-    private PlayerService playerService;
     @Autowired
     private BoardService boardService;
     @Autowired
@@ -54,8 +44,7 @@ public class GameService {
     private final Map<String, ScheduledFuture<?>> healthLoops = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> powerLoops = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> syncLoops = new ConcurrentHashMap<>();
-    private Map<String, ScheduledFuture<?>> connectionWindows = new ConcurrentHashMap<>();
-    private final long CONNECTION_WINDOW_SECONDS = 30;
+    private final Map<String, ScheduledFuture<?>> connectionWindows = new ConcurrentHashMap<>();
 
     public synchronized void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
@@ -360,9 +349,8 @@ public class GameService {
     }
 
     public void openConnectionWindow(String gameId) {
-        ScheduledFuture<?> timer = scheduler.schedule(() -> {
-            handleConnectionWindowEnd(gameId);
-        }, CONNECTION_WINDOW_SECONDS, TimeUnit.SECONDS);
+        long CONNECTION_WINDOW_SECONDS = 30;
+        ScheduledFuture<?> timer = scheduler.schedule(() -> handleConnectionWindowEnd(gameId), CONNECTION_WINDOW_SECONDS, TimeUnit.SECONDS);
 
         connectionWindows.put(gameId, timer);
     }
@@ -549,7 +537,7 @@ public class GameService {
 
         Player winner;
         if (alive.size() == 1) {
-            winner = alive.get(0);
+            winner = alive.getFirst();
         } else if (alive.size() > 1) {
             winner = pickByHighestHealthThenFirst(alive);
         } else {
@@ -572,14 +560,14 @@ public class GameService {
 
         List<Player> maxes = candidates.stream()
                 .filter(p -> p.getHealth() == maxHealth)
-                .collect(Collectors.toList());
+                .toList();
 
         if (maxes.size() == 1)
-            return maxes.get(0);
+            return maxes.getFirst();
 
         return maxes.stream()
                 .min(Comparator.comparing(Player::getId))
-                .orElse(maxes.get(0));
+                .orElse(maxes.getFirst());
     }
 
     private void syncPlayersToDB(String gameId) {
