@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 
+import java.io.Serial;
+import java.io.Serializable;
+
 @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.PROPERTY,
@@ -15,5 +18,7 @@ import edu.escuelaing.dinochomp_backend.model.game.Player;
         @JsonSubTypes.Type(value = Player.class, name = "PLAYER"),
         @JsonSubTypes.Type(value = Food.class, name = "FOOD"),
 })
-public abstract class BoardItem {
+public abstract class BoardItem implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
 }

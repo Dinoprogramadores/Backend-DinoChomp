@@ -26,32 +26,5 @@ public class Player extends BoardItem {
     private int health;
     private boolean isAlive;
 
-
-
-    public void move(String direction) {
-        switch (direction) {
-            case "UP" -> positionY -= 1;
-            case "DOWN" -> positionY += 1;
-            case "LEFT" -> positionX -= 1;
-            case "RIGHT" -> positionX += 1;
-        }
-    }
-
-    public void loseHealth(int amount) {
-        if (isAlive) {
-            health -= amount;
-            if (health <= 0) {
-                health = 0;
-                isAlive = false;
-            }
-        }
-    }
-
-    public void addHealth(int amount) {
-        if (isAlive) {
-            health += amount;
-        }
-    }
-
 }
 
