@@ -12,10 +12,6 @@ public class PlayerMapper {
 
     public Player toEntity(PlayerRequestDTO dto) {
         if (dto == null) return null;
-        Dinosaur d = null;
-        if (dto.getId() != null) {
-            d = Dinosaur.builder().id(dto.getId()).build();
-        }
         return Player.builder()
                 .id(dto.getId())
                 .name(dto.getName())
@@ -28,8 +24,6 @@ public class PlayerMapper {
 
     public PlayerResponseDTO toDTO(Player p) {
         if (p == null) return null;
-        String dinosaurId = null;
-        if (p.getId() != null) dinosaurId = p.getId();
         return PlayerResponseDTO.builder()
                 .id(p.getId())
                 .name(p.getName())

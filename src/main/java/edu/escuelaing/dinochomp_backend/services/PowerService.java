@@ -15,7 +15,6 @@ import edu.escuelaing.dinochomp_backend.model.power.HealthPower;
 import edu.escuelaing.dinochomp_backend.model.power.Power;
 import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.repository.PowerRepository;
-import java.util.function.Supplier;
 
 @Service
 public class PowerService {
@@ -26,8 +25,8 @@ public class PowerService {
 
     // lista de poderes disponibles
     private final List<Supplier<Power>> powerPool =
-    new ArrayList<>(Arrays.asList(
-        () -> new HealthPower(20)
+    new ArrayList<>(List.of(
+            () -> new HealthPower(20)
     ));
 
 

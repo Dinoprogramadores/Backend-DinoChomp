@@ -1,4 +1,3 @@
-// filepath: /home/juan/Documentos/Backend-DinoChomp/src/main/java/edu/escuelaing/dinochomp_backend/controllers/PlayerController.java
 package edu.escuelaing.dinochomp_backend.controllers;
 
 import edu.escuelaing.dinochomp_backend.model.game.Player;
@@ -12,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/players")
@@ -35,7 +33,7 @@ public class PlayerController {
     @GetMapping
     public ResponseEntity<List<PlayerResponseDTO>> getAll() {
         List<Player> list = playerService.getAllPlayers();
-        return ResponseEntity.ok(list.stream().map(playerMapper::toDTO).collect(Collectors.toList()));
+        return ResponseEntity.ok(list.stream().map(playerMapper::toDTO).toList());
     }
 
     @GetMapping("/{id}")

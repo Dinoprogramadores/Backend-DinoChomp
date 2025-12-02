@@ -1,5 +1,4 @@
 package edu.escuelaing.dinochomp_backend.utils.dto.player;
-import lombok.AllArgsConstructor;
 import lombok.*;
 
 @Getter

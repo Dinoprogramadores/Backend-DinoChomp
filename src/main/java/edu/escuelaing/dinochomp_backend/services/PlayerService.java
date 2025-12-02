@@ -19,8 +19,8 @@ public class PlayerService {
 
     }
 
-    public Player savePlayer(Player player) {
-        return playerRepository.save(player);
+    public void savePlayer(Player player) {
+        playerRepository.save(player);
     }
 
     public boolean deletePlayer(String id) {

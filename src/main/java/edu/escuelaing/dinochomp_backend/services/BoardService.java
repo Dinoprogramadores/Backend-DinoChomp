@@ -63,7 +63,7 @@ public class BoardService {
                 int y = Integer.parseInt(parts[1]);
                 Point point = new Point(x, y);
 
-                BoardItem item = null;
+                BoardItem item;
 
                 if (v == null || "EMPTY".equals(v.toString())) {
                     item = null;
