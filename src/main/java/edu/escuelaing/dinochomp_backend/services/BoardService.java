@@ -119,6 +119,13 @@ public class BoardService {
         Object itemAtDest = redisTemplate.opsForHash().get(key, dest);
         Food eaten = null;
 
+        // Validar que el destino no esté ocupado por otro jugador
+        if (itemAtDest instanceof String id && id.startsWith("PLAYER:")) {
+            System.out.println("⚠️ Movimiento bloqueado: casilla (" + newX + "," + newY + ") ocupada");
+            // No mover, solo retornar sin comida
+            return Optional.empty();
+        }
+
         // Verificar si hay comida en el destino
         if (itemAtDest instanceof String id && id.startsWith("FOOD:")) {
             String foodId = id.replace("FOOD:", "");

@@ -55,7 +55,7 @@ public class GameService {
     private final Map<String, ScheduledFuture<?>> powerLoops = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> syncLoops = new ConcurrentHashMap<>();
     private Map<String, ScheduledFuture<?>> connectionWindows = new ConcurrentHashMap<>();
-    private final long CONNECTION_WINDOW_SECONDS = 10;
+    private final long CONNECTION_WINDOW_SECONDS = 30;
 
     public synchronized void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
@@ -175,7 +175,7 @@ public class GameService {
                 .ifPresent(f -> f.cancel(true));
     }
 
-    public Player movePlayer(String gameId, String playerId, String direction) {
+    public synchronized Player movePlayer(String gameId, String playerId, String direction) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
         if (gamePlayers == null)
             return null;
@@ -200,12 +200,19 @@ public class GameService {
             case "RIGHT" -> newX = Math.min(width - 1, newX + 1);
         }
 
+        // Validar que no hay otro jugador en destino (en memoria)
+        String destKey = newX + "," + newY;
+        boolean occupied = gamePlayers.values().stream()
+                .filter(p -> !p.getId().equals(playerId))
+                .anyMatch(p -> (p.getPositionX() + "," + p.getPositionY()).equals(destKey));
+
+        if (occupied) {
+            System.out.println("⚠️ Movimiento bloqueado para " + playerId + ": casilla ocupada");
+            return player; // Retornar sin cambios
+        }
+
         // Mover en Redis y obtener comida si la hay
         Optional<Food> eatenFood = boardService.movePlayer(game.getBoardId(), player, newX, newY);
-
-        // CRÍTICO: Actualizar la posición en memoria también
-        player.setPositionX(newX);
-        player.setPositionY(newY);
 
         // Si comió, aumentar salud
         eatenFood.ifPresent(food -> {
@@ -234,8 +241,10 @@ public class GameService {
 
     public void reduceHealthOverTime(String gameId) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
-        if (gamePlayers == null)
+        if (gamePlayers == null || gamePlayers.size() < 2) {
+            System.out.println("⚠️ Juego " + gameId + " pausado: menos de 2 jugadores en memoria");
             return;
+        }
 
         for (Player player : gamePlayers.values()) {
             if (player.isAlive()) {
@@ -258,7 +267,7 @@ public class GameService {
 
         Optional<Long> remaining = getRemainingSeconds(gameId);
         if (remaining.isPresent() && remaining.get() <= 0) {
-            endGame(gameId);
+            endGame(gameId, "El tiempo se ha agotado.");
             return;
         }
 
@@ -268,7 +277,7 @@ public class GameService {
 
         if (aliveCount <= 1) {
             computeAndSetWinner(gameId);
-            endGame(gameId);
+            endGame(gameId, "Hay " + aliveCount + " jugadores vivos.");
         }
     }
 
@@ -362,9 +371,12 @@ public class GameService {
         Map<String, Player> players = activePlayers.get(gameId);
         int count = (players != null) ? players.size() : 0;
 
+        System.out.println("Ventana de conexión cerrada para " + gameId + ". Jugadores: " + count);
+
         if (count >= 2) {
             startGameLoop(gameId);
         } else {
+            System.out.println("⚠️ Juego no iniciado: se necesitan al menos 2 jugadores");
             stopGameLoop(gameId);
         }
 
@@ -584,13 +596,14 @@ public class GameService {
         }
     }
 
-    public void endGame(String gameId) {
+    public void endGame(String gameId, String message) {
         Optional<Game> gameOpt = getGameById(gameId);
         if (gameOpt.isEmpty()) {
             return;
         }
 
         Game game = gameOpt.get();
+        System.out.println("Juego finalizado: " + message);
         String winner = (game.getWinner() != null) ? game.getWinner().getName() : "Ninguno";
 
         template.convertAndSend(
