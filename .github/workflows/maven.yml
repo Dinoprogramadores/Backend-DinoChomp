@@ -1,0 +1,38 @@
+name: Java CI with Maven + SonarCloud
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Necesario para SonarCloud
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Cache SonarCloud packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.sonar/cache
+        key: ${{ runner.os }}-sonar
+        restore-keys: ${{ runner.os }}-sonar
+
+    - name: Build and analyze
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        mvn -B verify -U org.sonarsource.scanner.maven:sonar-maven-plugin:5.3.0.6276:sonar \
+          -Dsonar.organization=dinoprogramadores \
+          -Dsonar.projectKey=Dinoprogramadores_Backend-DinoChomp \
+          -Dsonar.host.url=https://sonarcloud.io \
+          -Dsonar.branch.name=develop
