@@ -43,6 +43,13 @@ public class PlayerController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/email/{email}")
+    public ResponseEntity<PlayerResponseDTO> getByEmail(@PathVariable String email) {
+        return playerService.getPlayerByEmail(email)
+                .map(p -> ResponseEntity.ok(playerMapper.toDTO(p)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<PlayerResponseDTO> update(@PathVariable String id, @RequestBody PlayerRequestDTO dto) {
         Player updatedEntity = playerMapper.toEntity(dto);

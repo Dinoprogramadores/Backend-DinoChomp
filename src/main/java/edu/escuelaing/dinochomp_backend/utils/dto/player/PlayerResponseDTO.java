@@ -9,6 +9,7 @@ import lombok.*;
 public class PlayerResponseDTO {
     private String id;
     private String name;
+    private String email;
     private String password;
     private int positionX;
     private int positionY;
