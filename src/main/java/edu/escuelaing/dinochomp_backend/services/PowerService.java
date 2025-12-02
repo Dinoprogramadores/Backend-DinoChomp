@@ -1,20 +1,18 @@
 package edu.escuelaing.dinochomp_backend.services;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-import java.util.function.Supplier;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.model.power.HealthPower;
 import edu.escuelaing.dinochomp_backend.model.power.Power;
 import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.repository.PowerRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.function.Supplier;
 
 @Service
 public class PowerService {
@@ -23,12 +21,11 @@ public class PowerService {
     @Autowired
     private PlayerRepository playerRepository;
 
-    // lista de poderes disponibles
+    // Lista de poderes disponibles
     private final List<Supplier<Power>> powerPool =
     new ArrayList<>(List.of(
             () -> new HealthPower(20)
     ));
-
 
     private final Random random = new Random();
 
@@ -39,7 +36,6 @@ public class PowerService {
     public Optional<Power> getPowerByName(String name) {
         return powerRepository.findById(name);
     }
-    
 
     public Power savePower(Power power) {
         return powerRepository.save(power);

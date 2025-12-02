@@ -10,6 +10,8 @@ import java.util.Map;
 
 public class BoardMapper {
 
+    private BoardMapper() {}
+
     public static BoardDocument toDocument(Board board) {
         BoardDocument doc = new BoardDocument();
         doc.setId(board.getId());
@@ -26,7 +28,6 @@ public class BoardMapper {
         return doc;
     }
 
-    @SuppressWarnings("unchecked")
     public static Board fromDocument(BoardDocument doc) {
         Board board = new Board(doc.getWidth(), doc.getHeight());
         board.setId(doc.getId());
@@ -37,8 +38,8 @@ public class BoardMapper {
             Point p = new Point(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
 
             Object value = entry.getValue();
-            if (value instanceof BoardItem) {
-                deserialized.put(p, (BoardItem) value);
+            if (value instanceof BoardItem boardItem) {
+                deserialized.put(p, boardItem);
             } else {
                 deserialized.put(p, null);
             }

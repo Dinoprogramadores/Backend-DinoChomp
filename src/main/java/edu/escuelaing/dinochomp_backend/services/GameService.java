@@ -7,8 +7,9 @@ import edu.escuelaing.dinochomp_backend.model.game.Game;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.repository.GameRepository;
 import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
+import edu.escuelaing.dinochomp_backend.utils.DinoChompException;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -17,14 +18,11 @@ import java.awt.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class GameService {
     @Autowired
     private SimpMessagingTemplate template;
@@ -46,16 +44,24 @@ public class GameService {
     private final Map<String, ScheduledFuture<?>> syncLoops = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> connectionWindows = new ConcurrentHashMap<>();
 
+    private static final String TOPIC= "/topic/games/";
+    private static final String PLAYERS = "/players";
+    private static final String STATUS = "status";
+    private static final String OWNER = "owner";
+    private static final String TIMESTAMP = "timestamp";
+    private static final String POWER = "/power";
+
+
     public synchronized void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
-            throw new RuntimeException("Player inválido");
+            throw new DinoChompException("Player inválido");
         }
 
         activePlayers.putIfAbsent(gameId, new ConcurrentHashMap<>());
         Map<String, Player> players = activePlayers.get(gameId);
 
         Game game = gameRepository.findById(gameId)
-                .orElseThrow(() -> new RuntimeException("Game no encontrado: " + gameId));
+                .orElseThrow(() -> new DinoChompException("Game no encontrado: " + gameId));
         int width = game.getWidth();
         int height = game.getHeight();
 
@@ -79,7 +85,7 @@ public class GameService {
         }
 
         if (spawn == null) {
-            throw new RuntimeException("No hay esquinas disponibles para " + player.getId());
+            throw new DinoChompException("No hay esquinas disponibles para " + player.getId());
         }
 
         player.setPositionX(spawn.x);
@@ -88,7 +94,7 @@ public class GameService {
         playerRepository.save(player);
         players.put(player.getId(), player);
 
-        System.out.println("Jugador " + player.getId() + " agregado en esquina (" + spawn.x + "," + spawn.y + ")");
+        log.info("Jugador " + player.getId() + " agregado en esquina (" + spawn.x + "," + spawn.y + ")");
 
         PlayerPositionDTO dto = new PlayerPositionDTO(
                 player.getId(),
@@ -98,7 +104,7 @@ public class GameService {
                 player.getHealth(),
                 player.isAlive());
 
-        template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+        template.convertAndSend(TOPIC + gameId + PLAYERS, dto);
         syncPowerStateToPlayer(gameId);
     }
 
@@ -117,13 +123,13 @@ public class GameService {
         }
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("status", status);
-        payload.put("owner", currentOwner);
-        payload.put("timestamp", Instant.now().toString());
+        payload.put(STATUS, status);
+        payload.put(OWNER, currentOwner);
+        payload.put(TIMESTAMP, Instant.now().toString());
 
-        template.convertAndSend("/topic/games/" + gameId + "/power", payload);
+        template.convertAndSend(TOPIC + gameId + POWER, payload);
 
-        System.out.println("Estado del poder sincronizado para juego " + gameId + ": " + status);
+        log.info("Estado del poder sincronizado para juego {}: {}", gameId, status);
     }
 
     public void startGameLoop(String gameId) {
@@ -174,7 +180,7 @@ public class GameService {
             return null;
 
         Game game = gameRepository.findById(gameId)
-                .orElseThrow(() -> new RuntimeException("No game found"));
+                .orElseThrow(() -> new DinoChompException("No game found"));
 
         int width = game.getWidth();
         int height = game.getHeight();
@@ -187,6 +193,7 @@ public class GameService {
             case "DOWN" -> newY = Math.min(height - 1, newY + 1);
             case "LEFT" -> newX = Math.max(0, newX - 1);
             case "RIGHT" -> newX = Math.min(width - 1, newX + 1);
+            default -> throw new IllegalArgumentException("Dirección inválida: " + direction);
         }
 
         // Validar que no hay otro jugador en destino (en memoria)
@@ -196,7 +203,7 @@ public class GameService {
                 .anyMatch(p -> (p.getPositionX() + "," + p.getPositionY()).equals(destKey));
 
         if (occupied) {
-            System.out.println("⚠️ Movimiento bloqueado para " + playerId + ": casilla ocupada");
+            log.info("Movimiento bloqueado para {}: casilla ocupada", playerId);
             return player; // Retornar sin cambios
         }
 
@@ -212,7 +219,7 @@ public class GameService {
             foodEvent.put("id", food.getId());
             foodEvent.put("x", food.getPositionX());
             foodEvent.put("y", food.getPositionY());
-            template.convertAndSend("/topic/games/" + gameId + "/food", foodEvent);
+            template.convertAndSend(TOPIC + gameId + "/food", foodEvent);
         });
 
         PlayerPositionDTO dto = new PlayerPositionDTO(
@@ -223,7 +230,7 @@ public class GameService {
                 player.getHealth(),
                 player.isAlive()
         );
-        template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+        template.convertAndSend(TOPIC + gameId + PLAYERS, dto);
 
         return player;
     }
@@ -231,7 +238,7 @@ public class GameService {
     public void reduceHealthOverTime(String gameId) {
         Map<String, Player> gamePlayers = activePlayers.get(gameId);
         if (gamePlayers == null || gamePlayers.size() < 2) {
-            System.out.println("⚠️ Juego " + gameId + " pausado: menos de 2 jugadores en memoria");
+            log.info("Juego {} pausado: menos de 2 jugadores en memoria", gameId);
             return;
         }
 
@@ -250,7 +257,7 @@ public class GameService {
                         player.getHealth(),
                         player.isAlive());
 
-                template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+                template.convertAndSend(TOPIC + gameId + PLAYERS, dto);
             }
         }
 
@@ -279,11 +286,11 @@ public class GameService {
         powerOwner.remove(gameId);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("status", "AVAILABLE");
-        payload.put("owner", null);
-        payload.put("timestamp", Instant.now().toString());
+        payload.put(STATUS, "AVAILABLE");
+        payload.put(OWNER, null);
+        payload.put(TIMESTAMP, Instant.now().toString());
 
-        template.convertAndSend("/topic/games/" + gameId + "/power", payload);
+        template.convertAndSend(TOPIC + gameId + POWER, payload);
     }
 
     public synchronized void claimPower(String gameId, String playerId) {
@@ -295,22 +302,22 @@ public class GameService {
         usePower(gameId, playerId);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("status", "CLAIMED");
-        payload.put("owner", playerId);
-        payload.put("timestamp", Instant.now().toString());
+        payload.put(STATUS, "CLAIMED");
+        payload.put(OWNER, playerId);
+        payload.put(TIMESTAMP, Instant.now().toString());
 
-        template.convertAndSend("/topic/games/" + gameId + "/power", payload);
+        template.convertAndSend(TOPIC + gameId + POWER, payload);
     }
 
     public void usePower(String gameId, String playerId) {
         String currentOwner = powerOwner.get(gameId);
         if (!playerId.equals(currentOwner)) {
-            System.out.println("Jugador " + playerId + " intentó usar un poder que no tiene");
+            log.info("Jugador {} intentó usar un poder que no tiene", playerId);
             return;
         }
 
         Player player = playerRepository.findById(playerId)
-                .orElseThrow(() -> new RuntimeException("Player not found to apply the power"));
+                .orElseThrow(() -> new DinoChompException("Player not found to apply the power"));
 
         Player updatedPlayer = powerService.activateRandomPower(player);
 
@@ -324,11 +331,11 @@ public class GameService {
         powerAvailable.put(gameId, false);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("status", "USED");
-        payload.put("owner", playerId);
-        payload.put("timestamp", Instant.now().toString());
+        payload.put(STATUS, "USED");
+        payload.put(OWNER, playerId);
+        payload.put(TIMESTAMP, Instant.now().toString());
 
-        template.convertAndSend("/topic/games/" + gameId + "/power", payload);
+        template.convertAndSend(TOPIC + gameId + POWER, payload);
     }
 
     public Game createGame(Game game, int totalFood) {
@@ -359,56 +366,42 @@ public class GameService {
         Map<String, Player> players = activePlayers.get(gameId);
         int count = (players != null) ? players.size() : 0;
 
-        System.out.println("Ventana de conexión cerrada para " + gameId + ". Jugadores: " + count);
+        log.info("Ventana de conexión cerrada para {}. Jugadores: {}", gameId, count);
 
         if (count >= 2) {
             startGameLoop(gameId);
         } else {
-            System.out.println("⚠️ Juego no iniciado: se necesitan al menos 2 jugadores");
+            log.info("Juego no iniciado: se necesitan al menos 2 jugadores.");
             stopGameLoop(gameId);
         }
 
         connectionWindows.remove(gameId);
     }
 
-    // CORREGIDO: seedFood ahora trabaja directamente con BoardService
     private void seedFood(String boardId, int width, int height, int totalFood) {
-        if (width <= 2 || height <= 2 || totalFood <= 0)
+        if (width <= 2 || height <= 2 || totalFood <= 0) {
             return;
+        }
 
         Random random = new Random();
         int placed = 0;
         int maxAttempts = totalFood * 5;
         int attempts = 0;
 
-        // Obtener el board actual para verificar posiciones ocupadas
-        Optional<Board> boardOpt = boardService.getBoard(boardId);
-        if (boardOpt.isEmpty()) {
-            throw new RuntimeException("Board not found: " + boardId);
-        }
-        Board board = boardOpt.get();
+        Board board = boardService.getBoard(boardId)
+                .orElseThrow(() -> new DinoChompException("Board not found: " + boardId));
 
         while (placed < totalFood && attempts < maxAttempts) {
             attempts++;
 
             int x = random.nextInt(width);
             int y = random.nextInt(height);
-
-            // Evitar esquinas
-            boolean isCorner = (x == 0 && y == 0)
-                    || (x == 0 && y == height - 1)
-                    || (x == width - 1 && y == 0)
-                    || (x == width - 1 && y == height - 1);
-            if (isCorner)
-                continue;
-
             Point p = new Point(x, y);
 
-            // Verificar si está ocupado
-            if (!board.isNull(p))
+            if (isCorner(x, y, width, height) || !isFree(board, p)) {
                 continue;
+            }
 
-            // Crear Food
             Food f = Food.builder()
                     .name("pollo")
                     .positionX(x)
@@ -416,14 +409,22 @@ public class GameService {
                     .nutritionValue(10)
                     .build();
 
-            // Agregar usando BoardService (guarda en Redis y DB)
             boardService.addFood(boardId, f);
-
-            // Actualizar el board local para las próximas iteraciones
             board.getMap().put(p, f);
 
             placed++;
         }
+    }
+
+    private boolean isCorner(int x, int y, int width, int height) {
+        return (x == 0 && y == 0)
+                || (x == 0 && y == height - 1)
+                || (x == width - 1 && y == 0)
+                || (x == width - 1 && y == height - 1);
+    }
+
+    private boolean isFree(Board board, Point p) {
+        return board.isNull(p);
     }
 
     public List<Game> getAllGames() {
@@ -462,21 +463,21 @@ public class GameService {
                 return Optional.empty();
             }
 
-            // IMPORTANTE: Primero buscar/guardar el Player en DB
+            // Primero buscar/guardar el Player en DB
             Player player = playerRepository.findById(playerId)
-                    .orElseThrow(() -> new RuntimeException("Player no encontrado: " + playerId));
+                    .orElseThrow(() -> new DinoChompException("Player no encontrado: " + playerId));
 
             // Asegurar que el player esté guardado con su posición actual
             playerRepository.save(player);
 
             Game game = gameRepository.findById(gameId)
-                    .orElseThrow(() -> new RuntimeException("Game no encontrado: " + gameId));
+                    .orElseThrow(() -> new DinoChompException("Game no encontrado: " + gameId));
 
             try {
                 // Ahora sí agregar al board (Redis + DB)
                 boardService.addPlayer(game.getBoardId(), player);
             } catch (Exception e) {
-                throw new RuntimeException("Error agregando player al board: " + e.getMessage(), e);
+                throw new DinoChompException("Error agregando player al board: " + e.getMessage());
             }
 
             return Optional.of(gameRepository.save(g));
@@ -533,7 +534,7 @@ public class GameService {
 
         List<Player> alive = playersInGame.stream()
                 .filter(Player::isAlive)
-                .collect(Collectors.toList());
+                .toList();
 
         Player winner;
         if (alive.size() == 1) {
@@ -579,7 +580,7 @@ public class GameService {
             try {
                 playerRepository.save(p);
             } catch (Exception e) {
-                System.out.println("Error sincronizando jugador " + p.getId() + ": " + e.getMessage());
+                log.error("Error sincronizando jugador {}: {}", p.getId(), e.getMessage());
             }
         }
     }
@@ -591,11 +592,11 @@ public class GameService {
         }
 
         Game game = gameOpt.get();
-        System.out.println("Juego finalizado: " + message);
+        log.info("Juego finalizado: {}", message);
         String winner = (game.getWinner() != null) ? game.getWinner().getName() : "Ninguno";
 
         template.convertAndSend(
-                "/topic/games/" + gameId + "/events",
+                TOPIC + gameId + "/events",
                 Map.of(
                         "event", "GAME_ENDED",
                         "winner", winner
@@ -608,6 +609,6 @@ public class GameService {
         powerAvailable.remove(gameId);
         powerOwner.remove(gameId);
 
-        System.out.println("Partida " + gameId + " finalizada correctamente");
+        log.info("Partida {} finalizada correctamente", gameId);
     }
 }
