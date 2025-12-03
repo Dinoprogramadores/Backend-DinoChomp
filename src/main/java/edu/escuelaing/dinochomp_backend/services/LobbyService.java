@@ -1,12 +1,14 @@
 package edu.escuelaing.dinochomp_backend.services;
 
 import edu.escuelaing.dinochomp_backend.model.game.Player;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@RequiredArgsConstructor
 public class LobbyService {
 
     private final Map<String, List<Player>> lobbies = new ConcurrentHashMap<>();

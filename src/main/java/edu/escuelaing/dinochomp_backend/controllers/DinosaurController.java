@@ -5,6 +5,7 @@ import edu.escuelaing.dinochomp_backend.services.DinosaurService;
 import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.DinosaurMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +15,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/dinosaurs")
+@RequiredArgsConstructor
 public class DinosaurController {
 
-    @Autowired
-    private DinosaurService dinosaurService;
-
-    @Autowired
-    private DinosaurMapper dinosaurMapper;
+    private final DinosaurService dinosaurService;
+    private final DinosaurMapper dinosaurMapper;
 
     @PostMapping
     public ResponseEntity<DinosaurResponseDTO> create(@RequestBody DinosaurRequestDTO dto) {

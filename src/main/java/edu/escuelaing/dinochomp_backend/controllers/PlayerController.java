@@ -5,6 +5,7 @@ import edu.escuelaing.dinochomp_backend.services.PlayerService;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.PlayerMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +15,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/players")
+@RequiredArgsConstructor
 public class PlayerController {
 
-    @Autowired
-    private PlayerService playerService;
-
-    @Autowired
-    private PlayerMapper playerMapper;
+    private final PlayerService playerService;
+    private final PlayerMapper playerMapper;
 
     @PostMapping
     public ResponseEntity<PlayerResponseDTO> create(@RequestBody PlayerRequestDTO dto) {

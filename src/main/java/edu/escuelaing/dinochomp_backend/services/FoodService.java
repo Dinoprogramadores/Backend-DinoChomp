@@ -3,6 +3,7 @@ package edu.escuelaing.dinochomp_backend.services;
 import java.util.List;
 import java.util.Optional;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -10,9 +11,10 @@ import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.repository.FoodRepository;
 
 @Service
+@RequiredArgsConstructor
 public class FoodService {
-    @Autowired
-    private FoodRepository foodRepository;  
+
+    private final FoodRepository foodRepository;
 
     public List<Food> getAllFoods() {
         return foodRepository.findAll();

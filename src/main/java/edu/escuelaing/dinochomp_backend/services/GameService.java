@@ -9,6 +9,7 @@ import edu.escuelaing.dinochomp_backend.repository.GameRepository;
 import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.utils.DinoChompException;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -23,17 +24,14 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class GameService {
-    @Autowired
-    private SimpMessagingTemplate template;
-    @Autowired
-    private GameRepository gameRepository;
-    @Autowired
-    private PlayerRepository playerRepository;
-    @Autowired
-    private BoardService boardService;
-    @Autowired
-    private PowerService powerService;
+
+    private final SimpMessagingTemplate template;
+    private final GameRepository gameRepository;
+    private final PlayerRepository playerRepository;
+    private final BoardService boardService;
+    private final PowerService powerService;
 
     private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);

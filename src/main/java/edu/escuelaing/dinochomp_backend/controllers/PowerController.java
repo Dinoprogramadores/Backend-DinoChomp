@@ -5,6 +5,7 @@ import edu.escuelaing.dinochomp_backend.services.PowerService;
 import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.PowerMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +15,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/powers")
+@RequiredArgsConstructor
 public class PowerController {
 
-    @Autowired
-    private PowerService powerService;
-
-    @Autowired
-    private PowerMapper powerMapper;
+    private final PowerService powerService;
+    private final PowerMapper powerMapper;
 
     @PostMapping
     public ResponseEntity<PowerResponseDTO> create(@RequestBody PowerRequestDTO dto) {

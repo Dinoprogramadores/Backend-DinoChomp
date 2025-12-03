@@ -5,6 +5,7 @@ import edu.escuelaing.dinochomp_backend.services.GameService;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerMoveMessage;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerActivationtDTO;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -15,13 +16,11 @@ import org.springframework.stereotype.Controller;
 
 @Controller
 @Slf4j
+@RequiredArgsConstructor
 public class GameWebSocketController {
 
-    @Autowired
-    private GameService gameService;
-
-    @Autowired
-    private SimpMessagingTemplate template;
+    private final GameService gameService;
+    private final SimpMessagingTemplate template;
 
     private static final String TOPIC = "/topic/games/";
 

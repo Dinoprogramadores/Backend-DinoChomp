@@ -2,15 +2,17 @@ package edu.escuelaing.dinochomp_backend.services;
 import java.util.List;
 import java.util.Optional;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.repository.DinosaurRepository;
 
 @Service
+@RequiredArgsConstructor
 public class DinosaurService {
-    @Autowired
-    private DinosaurRepository dinosaurRepository;
+
+    private final DinosaurRepository dinosaurRepository;
 
     public Dinosaur createDinosaur(Dinosaur dinosaur) {
         return dinosaurRepository.save(dinosaur);

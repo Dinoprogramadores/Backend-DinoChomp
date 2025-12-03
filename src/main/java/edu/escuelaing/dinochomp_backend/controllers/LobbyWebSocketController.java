@@ -2,6 +2,7 @@ package edu.escuelaing.dinochomp_backend.controllers;
 
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.services.LobbyService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -12,13 +13,11 @@ import org.springframework.stereotype.Controller;
 
 @Controller
 @Slf4j
+@RequiredArgsConstructor
 public class LobbyWebSocketController {
 
-    @Autowired
-    private LobbyService lobbyService;
-
-    @Autowired
-    private SimpMessagingTemplate template;
+    private final LobbyService lobbyService;
+    private final SimpMessagingTemplate template;
 
     private static final String TOPIC = "/topic/lobbies/";
 

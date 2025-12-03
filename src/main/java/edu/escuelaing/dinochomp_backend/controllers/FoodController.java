@@ -5,6 +5,7 @@ import edu.escuelaing.dinochomp_backend.services.FoodService;
 import edu.escuelaing.dinochomp_backend.utils.dto.food.FoodRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.food.FoodResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.FoodMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +15,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/foods")
+@RequiredArgsConstructor
 public class FoodController {
 
-    @Autowired
-    private FoodService foodService;
-
-    @Autowired
-    private FoodMapper foodMapper;
+    private final FoodService foodService;
+    private final FoodMapper foodMapper;
 
     @PostMapping
     public ResponseEntity<FoodResponseDTO> create(@RequestBody FoodRequestDTO dto) {
