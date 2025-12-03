@@ -1,5 +1,4 @@
 package edu.escuelaing.dinochomp_backend.utils.dto.player;
-import lombok.AllArgsConstructor;
 import lombok.*;
 
 @Getter
@@ -10,6 +9,7 @@ import lombok.*;
 public class PlayerResponseDTO {
     private String id;
     private String name;
+    private String email;
     private String password;
     private int positionX;
     private int positionY;

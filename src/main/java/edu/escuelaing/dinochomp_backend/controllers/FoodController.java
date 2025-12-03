@@ -11,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/foods")
@@ -34,7 +33,7 @@ public class FoodController {
     @GetMapping
     public ResponseEntity<List<FoodResponseDTO>> getAll() {
         List<Food> list = foodService.getAllFoods();
-        return ResponseEntity.ok(list.stream().map(foodMapper::toDTO).collect(Collectors.toList()));
+        return ResponseEntity.ok(list.stream().map(foodMapper::toDTO).toList());
     }
 
     @GetMapping("/{id}")

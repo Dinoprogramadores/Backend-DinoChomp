@@ -5,8 +5,7 @@ import edu.escuelaing.dinochomp_backend.services.GameService;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerMoveMessage;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerActivationtDTO;
-import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerRequestDTO;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -15,6 +14,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 @Controller
+@Slf4j
 public class GameWebSocketController {
 
     @Autowired
@@ -23,16 +23,18 @@ public class GameWebSocketController {
     @Autowired
     private SimpMessagingTemplate template;
 
+    private static final String TOPIC = "/topic/games/";
+
     @MessageMapping("/games/{gameId}/start")
     public void startGame(@DestinationVariable String gameId) {
         gameService.startGameLoop(gameId);
-        template.convertAndSend("/topic/games/" + gameId + "/status", "Game started!");
+        template.convertAndSend(TOPIC + gameId + "/status", "Game started!");
     }
 
     @MessageMapping("/games/{gameId}/stop")
     public void stopGame(@DestinationVariable String gameId) {
         gameService.stopGameLoop(gameId);
-        template.convertAndSend("/topic/games/" + gameId + "/status", "Game stopped!");
+        template.convertAndSend(TOPIC + gameId + "/status", "Game stopped!");
     }
 
     @MessageMapping("/games/{gameId}/power/claim")
@@ -45,7 +47,6 @@ public class GameWebSocketController {
         gameService.usePower(gameId, playerId);
     }
 
-    // Cliente envía a: /app/games/{gameId}/move
     @MessageMapping("/games/{gameId}/move")
     public void handleMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage msg) {
         if (msg == null || msg.getPlayerId() == null || msg.getDirection() == null) {
@@ -53,8 +54,7 @@ public class GameWebSocketController {
         }
         Player updated = gameService.movePlayer(gameId, msg.getPlayerId(), msg.getDirection());
         if (updated == null) {
-            System.out.println("Movimiento inválido o jugador no encontrado"
-                    );
+            log.info("Movimiento inválido o jugador no encontrado");
             return; // Evita el NPE
         }
         PlayerPositionDTO dto = PlayerPositionDTO.builder()
@@ -66,13 +66,13 @@ public class GameWebSocketController {
                 .isAlive(updated.isAlive())
                 .build();
 
-        template.convertAndSend("/topic/games/" + gameId + "/players", dto);
+        template.convertAndSend(TOPIC + gameId + "/players", dto);
     }
 
     @MessageMapping("/games/{gameId}/join")
     public void joinGame(@DestinationVariable String gameId, @Payload Player player) {
         if (player == null || player.getId() == null) {
-        System.err.println("Jugador inválido en join");
+        log.info("Jugador inválido en join");
         return;
         }
         gameService.registerPlayer(gameId, player);

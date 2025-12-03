@@ -1,4 +1,3 @@
-// filepath: /home/juan/Documentos/Backend-DinoChomp/src/main/java/edu/escuelaing/dinochomp_backend/controllers/PlayerController.java
 package edu.escuelaing.dinochomp_backend.controllers;
 
 import edu.escuelaing.dinochomp_backend.model.game.Player;
@@ -12,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/players")
@@ -28,19 +26,26 @@ public class PlayerController {
     public ResponseEntity<PlayerResponseDTO> create(@RequestBody PlayerRequestDTO dto) {
         if (dto == null) return ResponseEntity.badRequest().build();
         Player entity = playerMapper.toEntity(dto);
-        Player created = playerService.createPlayer(entity);
+        Player created = playerService.savePlayer(entity);
         return new ResponseEntity<>(playerMapper.toDTO(created), HttpStatus.CREATED);
     }
 
     @GetMapping
     public ResponseEntity<List<PlayerResponseDTO>> getAll() {
         List<Player> list = playerService.getAllPlayers();
-        return ResponseEntity.ok(list.stream().map(playerMapper::toDTO).collect(Collectors.toList()));
+        return ResponseEntity.ok(list.stream().map(playerMapper::toDTO).toList());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PlayerResponseDTO> getById(@PathVariable String id) {
         return playerService.getPlayerById(id)
+                .map(p -> ResponseEntity.ok(playerMapper.toDTO(p)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/email")
+    public ResponseEntity<PlayerResponseDTO> getByEmail(@RequestParam String email) {
+        return playerService.getPlayerByEmail(email)
                 .map(p -> ResponseEntity.ok(playerMapper.toDTO(p)))
                 .orElse(ResponseEntity.notFound().build());
     }

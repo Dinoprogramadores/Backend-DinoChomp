@@ -2,7 +2,6 @@ package edu.escuelaing.dinochomp_backend.utils.dto.player;
 
 import java.io.Serializable;
 
-import lombok.AllArgsConstructor;
 import lombok.*;
 
 @Getter
@@ -13,6 +12,7 @@ import lombok.*;
 public class PlayerRequestDTO implements Serializable {
     private String id;
     private String name;
+    private String email;
     private String password;
     private int positionX;
     private int positionY;

@@ -12,13 +12,11 @@ public class PlayerMapper {
 
     public Player toEntity(PlayerRequestDTO dto) {
         if (dto == null) return null;
-        Dinosaur d = null;
-        if (dto.getId() != null) {
-            d = Dinosaur.builder().id(dto.getId()).build();
-        }
         return Player.builder()
                 .id(dto.getId())
                 .name(dto.getName())
+                .email(dto.getEmail())
+                .password(dto.getPassword())
                 .positionX(dto.getPositionX())
                 .positionY(dto.getPositionY())
                 .health(dto.getHealth())
@@ -28,11 +26,11 @@ public class PlayerMapper {
 
     public PlayerResponseDTO toDTO(Player p) {
         if (p == null) return null;
-        String dinosaurId = null;
-        if (p.getId() != null) dinosaurId = p.getId();
         return PlayerResponseDTO.builder()
                 .id(p.getId())
                 .name(p.getName())
+                .email(p.getEmail())
+                .password(p.getPassword())
                 .positionX(p.getPositionX())
                 .positionY(p.getPositionY())
                 .health(p.getHealth())

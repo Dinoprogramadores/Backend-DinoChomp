@@ -11,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/dinosaurs")
@@ -34,7 +33,7 @@ public class DinosaurController {
     @GetMapping
     public ResponseEntity<List<DinosaurResponseDTO>> getAll() {
         List<Dinosaur> list = dinosaurService.getAllDinosaurs();
-        return ResponseEntity.ok(list.stream().map(dinosaurMapper::toDTO).collect(Collectors.toList()));
+        return ResponseEntity.ok(list.stream().map(dinosaurMapper::toDTO).toList());
     }
 
     @GetMapping("/{id}")
