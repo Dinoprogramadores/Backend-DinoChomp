@@ -90,6 +90,8 @@ public class GameService {
 
         player.setPositionX(spawn.x);
         player.setPositionY(spawn.y);
+        player.setHealth(100);
+        player.setAlive(true);
 
         playerRepository.save(player);
         players.put(player.getId(), player);
