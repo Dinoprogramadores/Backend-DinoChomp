@@ -35,4 +35,3 @@ jobs:
           -Dsonar.organization=dinoprogramadores \
           -Dsonar.projectKey=Dinoprogramadores_Backend-DinoChomp \
           -Dsonar.host.url=https://sonarcloud.io \
-          -Dsonar.branch.name=develop
