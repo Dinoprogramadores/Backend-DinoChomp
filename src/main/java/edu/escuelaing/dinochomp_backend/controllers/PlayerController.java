@@ -26,7 +26,7 @@ public class PlayerController {
     public ResponseEntity<PlayerResponseDTO> create(@RequestBody PlayerRequestDTO dto) {
         if (dto == null) return ResponseEntity.badRequest().build();
         Player entity = playerMapper.toEntity(dto);
-        Player created = playerService.createPlayer(entity);
+        Player created = playerService.savePlayer(entity);
         return new ResponseEntity<>(playerMapper.toDTO(created), HttpStatus.CREATED);
     }
 
@@ -43,8 +43,8 @@ public class PlayerController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/email/{email}")
-    public ResponseEntity<PlayerResponseDTO> getByEmail(@PathVariable String email) {
+    @GetMapping("/email")
+    public ResponseEntity<PlayerResponseDTO> getByEmail(@RequestParam String email) {
         return playerService.getPlayerByEmail(email)
                 .map(p -> ResponseEntity.ok(playerMapper.toDTO(p)))
                 .orElse(ResponseEntity.notFound().build());

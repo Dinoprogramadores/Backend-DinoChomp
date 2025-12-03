@@ -20,8 +20,8 @@ public class PlayerService {
 
     }
 
-    public void savePlayer(Player player) {
-        playerRepository.save(player);
+    public Player savePlayer(Player player) {
+       return playerRepository.save(player);
     }
 
     public boolean deletePlayer(String id) {
@@ -35,6 +35,7 @@ public class PlayerService {
     public Optional<Player> updatePlayer(String id, Player updatedPlayer) {
         return playerRepository.findById(id).map(player -> {
             player.setName(updatedPlayer.getName());
+            player.setEmail(updatedPlayer.getEmail());
             player.setPassword(updatedPlayer.getPassword());
             player.setPositionX(updatedPlayer.getPositionX());
             player.setPositionY(updatedPlayer.getPositionY());
@@ -44,15 +45,12 @@ public class PlayerService {
         });
     }
 
-    public Player createPlayer(Player player) {
-        return playerRepository.save(player);
-    }
-
     public List<Player> getAllPlayers() {
         return playerRepository.findAll();
     }
 
     public Optional<Player> getPlayerByEmail(String email) {
+        System.out.println("Searching for player with email: " + email);
         return playerRepository.findByEmail(email);
     }
 }

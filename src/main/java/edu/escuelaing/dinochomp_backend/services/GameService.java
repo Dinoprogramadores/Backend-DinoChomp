@@ -94,7 +94,7 @@ public class GameService {
         playerRepository.save(player);
         players.put(player.getId(), player);
 
-        log.info("Jugador " + player.getId() + " agregado en esquina (" + spawn.x + "," + spawn.y + ")");
+        log.info("Jugador {} agregado en esquina ({},{})", player.getId(), spawn.x, spawn.y);
 
         PlayerPositionDTO dto = new PlayerPositionDTO(
                 player.getId(),
@@ -372,7 +372,7 @@ public class GameService {
             startGameLoop(gameId);
         } else {
             log.info("Juego no iniciado: se necesitan al menos 2 jugadores.");
-            stopGameLoop(gameId);
+            endGame(gameId, "No hay suficientes jugadores para iniciar el juego.");
         }
 
         connectionWindows.remove(gameId);
@@ -576,12 +576,16 @@ public class GameService {
         if (players == null)
             return;
 
-        for (Player p : players.values()) {
-            try {
-                playerRepository.save(p);
-            } catch (Exception e) {
-                log.error("Error sincronizando jugador {}: {}", p.getId(), e.getMessage());
-            }
+        for (Player mem : players.values()) {
+            Player db = playerRepository.findById(mem.getId()).orElse(null);
+            if (db == null) continue;
+
+            db.setPositionX(mem.getPositionX());
+            db.setPositionY(mem.getPositionY());
+            db.setHealth(mem.getHealth());
+            db.setAlive(mem.isAlive());
+
+            playerRepository.save(db);
         }
     }
 
