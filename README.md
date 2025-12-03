@@ -122,4 +122,4 @@ git push origin feat/nueva-funcionalidad
 🦕
 
 Proyecto desarrollado por Dinoprogramadores 🧠💻
-Hecho con ☕ y ❤️ usando Spring Boot + MongoDB Atlas + Docker.
+Hecho con ☕ y ❤️ usando Spring Boot + MongoDB Atlas + Docker + AWS

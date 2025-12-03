@@ -1,10 +1,9 @@
 name: Java CI with Maven + SonarCloud
 on:
   push:
-    branches: [ "develop" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "develop" ]
-
+    branches: [ "main" ]
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,5 +34,5 @@ jobs:
         mvn -B verify -U org.sonarsource.scanner.maven:sonar-maven-plugin:5.3.0.6276:sonar \
           -Dsonar.organization=dinoprogramadores \
           -Dsonar.projectKey=Dinoprogramadores_Backend-DinoChomp \
-          -Dsonar.host.url=https://sonarcloud.io
-
+          -Dsonar.host.url=https://sonarcloud.io \
+          -Dsonar.branch.name=develop
