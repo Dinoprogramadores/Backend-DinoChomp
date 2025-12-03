@@ -3,11 +3,11 @@ package edu.escuelaing.dinochomp_backend.controllers;
 import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.game.Game;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
+import edu.escuelaing.dinochomp_backend.services.GameService;
 import edu.escuelaing.dinochomp_backend.utils.dto.dinosaur.DinosaurRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.game.GameRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.game.GameResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.GameMapper;
-import edu.escuelaing.dinochomp_backend.services.GameService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/games")
@@ -40,7 +39,7 @@ public class GameController {
     @GetMapping
     public ResponseEntity<List<GameResponseDTO>> getAllGames() {
         List<Game> games = gameService.getAllGames();
-        List<GameResponseDTO> dtos = games.stream().map(gameMapper::toDTO).collect(Collectors.toList());
+        List<GameResponseDTO> dtos = games.stream().map(gameMapper::toDTO).toList();
         return ResponseEntity.ok(dtos);
     }
 

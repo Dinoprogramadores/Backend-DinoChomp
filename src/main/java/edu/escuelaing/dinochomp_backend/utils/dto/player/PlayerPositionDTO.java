@@ -2,9 +2,7 @@ package edu.escuelaing.dinochomp_backend.utils.dto.player;
 
 import java.io.Serializable;
 
-import lombok.Getter;
 import lombok.*;
-import lombok.Setter;
 
 @Getter
 @Setter

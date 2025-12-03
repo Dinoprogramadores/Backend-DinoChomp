@@ -1,7 +1,5 @@
 package edu.escuelaing.dinochomp_backend.model.board;
 
-import edu.escuelaing.dinochomp_backend.model.food.Food;
-import edu.escuelaing.dinochomp_backend.model.game.Player;
 import org.springframework.data.annotation.Id;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
@@ -39,16 +37,6 @@ public class Board implements Serializable {
         }
     }
 
-    public Object getItem(Point p) {
-        return map.get(p);
-    }
-
-    public void setItem(Point p, BoardItem obj) {
-        if (insideBoard(p)) {
-            map.put(p, obj);
-        }
-    }
-
     public boolean isNull(Point p) {
         return insideBoard(p) && map.get(p) == null;
     }
@@ -56,55 +44,5 @@ public class Board implements Serializable {
     private boolean insideBoard(Point p) {
         return p.x >= 0 && p.x < width && p.y >= 0 && p.y < height;
     }
-
-    public void addPlayer(Player player) {
-        Point p = new Point(player.getPositionX(), player.getPositionY());
-        if (isNull(p)) {
-            map.put(p, player);
-        } else {
-            throw new IllegalStateException("It is not possible to place the player in " + p);
-        }
-    }
-
-    public void addFood(Food food) {
-        Point p = new Point(food.getPositionX(), food.getPositionY());
-        if (isNull(p)) {
-            map.put(p, food);
-        } else {
-            throw new IllegalStateException("It is not possible to place the food in " + p);
-        }
-    }
-
-    public void movePlayer(Player player, int newX, int newY) {
-        Point current = new Point(player.getPositionX(), player.getPositionY());
-        Point destination = new Point(newX, newY);
-
-        if (!insideBoard(destination)) return;
-
-        Object objAtDest = map.get(destination);
-
-        if (objAtDest instanceof Player) {
-            return;
-        }
-
-        if (objAtDest instanceof Food food) {
-            player.addHealth(food.getNutritionValue());
-        }
-        map.put(current, null);
-        map.put(destination, player);
-
-        player.setPositionX(newX);
-        player.setPositionY(newY);
-    }
-
-
-    private void act(Point p, Player player) {
-        Object obj = map.get(p);
-        if (obj instanceof Food food) {
-            map.put(p, null);
-            player.addHealth(food.getNutritionValue());
-        }
-    }
-
 }
 

@@ -11,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/powers")
@@ -34,12 +33,12 @@ public class PowerController {
     @GetMapping
     public ResponseEntity<List<PowerResponseDTO>> getAll() {
         List<Power> list = powerService.getAllPowers();
-        return ResponseEntity.ok(list.stream().map(powerMapper::toDTO).collect(Collectors.toList()));
+        return ResponseEntity.ok(list.stream().map(powerMapper::toDTO).toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PowerResponseDTO> getById(@PathVariable String name) {
-        return powerService.getPowerByName(name)
+    public ResponseEntity<PowerResponseDTO> getById(@PathVariable String id) {
+        return powerService.getPowerByName(id)
                 .map(p -> ResponseEntity.ok(powerMapper.toDTO(p)))
                 .orElse(ResponseEntity.notFound().build());
     }

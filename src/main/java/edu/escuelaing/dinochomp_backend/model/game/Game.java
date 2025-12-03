@@ -1,6 +1,5 @@
 package edu.escuelaing.dinochomp_backend.model.game;
 
-import edu.escuelaing.dinochomp_backend.model.board.Board;
 import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.utils.enums.Power;
 import lombok.*;
