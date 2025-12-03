@@ -210,6 +210,9 @@ public class GameService {
         // Mover en Redis y obtener comida si la hay
         Optional<Food> eatenFood = boardService.movePlayer(game.getBoardId(), player, newX, newY);
 
+        player.setPositionX(newX);
+        player.setPositionY(newY);
+
         // Si comió, aumentar salud
         eatenFood.ifPresent(food -> {
             player.setHealth(player.getHealth() + food.getNutritionValue());
@@ -378,30 +381,44 @@ public class GameService {
         connectionWindows.remove(gameId);
     }
 
+    // CORREGIDO: seedFood ahora trabaja directamente con BoardService
     private void seedFood(String boardId, int width, int height, int totalFood) {
-        if (width <= 2 || height <= 2 || totalFood <= 0) {
+        if (width <= 2 || height <= 2 || totalFood <= 0)
             return;
-        }
 
         Random random = new Random();
         int placed = 0;
         int maxAttempts = totalFood * 5;
         int attempts = 0;
 
-        Board board = boardService.getBoard(boardId)
-                .orElseThrow(() -> new DinoChompException("Board not found: " + boardId));
+        // Obtener el board actual para verificar posiciones ocupadas
+        Optional<Board> boardOpt = boardService.getBoard(boardId);
+        if (boardOpt.isEmpty()) {
+            throw new RuntimeException("Board not found: " + boardId);
+        }
+        Board board = boardOpt.get();
 
         while (placed < totalFood && attempts < maxAttempts) {
             attempts++;
 
             int x = random.nextInt(width);
             int y = random.nextInt(height);
+
+            // Evitar esquinas
+            boolean isCorner = (x == 0 && y == 0)
+                    || (x == 0 && y == height - 1)
+                    || (x == width - 1 && y == 0)
+                    || (x == width - 1 && y == height - 1);
+            if (isCorner)
+                continue;
+
             Point p = new Point(x, y);
 
-            if (isCorner(x, y, width, height) || !isFree(board, p)) {
+            // Verificar si está ocupado
+            if (!board.isNull(p))
                 continue;
-            }
 
+            // Crear Food
             Food f = Food.builder()
                     .name("pollo")
                     .positionX(x)
@@ -409,7 +426,10 @@ public class GameService {
                     .nutritionValue(10)
                     .build();
 
+            // Agregar usando BoardService (guarda en Redis y DB)
             boardService.addFood(boardId, f);
+
+            // Actualizar el board local para las próximas iteraciones
             board.getMap().put(p, f);
 
             placed++;
