@@ -343,6 +343,7 @@ public class GameService {
             throw new IllegalArgumentException("game required");
 
         Board board = boardService.createBoard(game.getWidth(), game.getHeight());
+
         game.setBoardId(board.getId());
 
         if (totalFood > 0) {

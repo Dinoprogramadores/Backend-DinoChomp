@@ -1,8 +1,12 @@
 package edu.escuelaing.dinochomp_backend.utils.dto.board;
 
-import lombok.Data;
+import lombok.*;
 
-@Data
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class AddPlayerDTO {
     private String playerId;
     private int positionX;
