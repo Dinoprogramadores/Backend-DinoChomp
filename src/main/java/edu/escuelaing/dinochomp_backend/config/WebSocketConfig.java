@@ -32,19 +32,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
         registry.addEndpoint("/ws/lobbies")
                 .setAllowedOriginPatterns("*")
-                .withSockJS()
-                .setSessionCookieNeeded(true)
-                .setStreamBytesLimit(512 * 1024)
-                .setHttpMessageCacheSize(1000)
-                .setDisconnectDelay(30 * 1000);
+                .withSockJS();
 
         registry.addEndpoint("/ws/games")
                 .setAllowedOriginPatterns("*")
-                .withSockJS()
-                .setSessionCookieNeeded(true)
-                .setStreamBytesLimit(512 * 1024)
-                .setHttpMessageCacheSize(1000)
-                .setDisconnectDelay(30 * 1000);
+                .withSockJS();
 
         // Redis listeners
         redisMessageListenerContainer.addMessageListener(
