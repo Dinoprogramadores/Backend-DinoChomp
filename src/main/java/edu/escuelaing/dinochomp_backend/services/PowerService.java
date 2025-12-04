@@ -6,7 +6,6 @@ import edu.escuelaing.dinochomp_backend.model.power.Power;
 import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.repository.PowerRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;

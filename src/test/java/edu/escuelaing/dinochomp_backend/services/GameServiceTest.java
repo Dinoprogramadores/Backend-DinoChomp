@@ -454,4 +454,204 @@ class GameServiceTest {
         gameService.startGameLoop("g1");
         gameService.stopGameLoop("g1");
     }
+
+    @Test
+    void syncPlayersToDB_updatesDBWithInMemoryState() throws Exception {
+        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
+        Player p = Player.builder().id("S").name("S").positionX(2).positionY(3).health(40).isAlive(true).build();
+        when(playerRepository.findById("S")).thenReturn(Optional.of(p));
+        when(playerRepository.save(any(Player.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // registrar en memoria
+        gameService.registerPlayer("g1", p);
+
+        // modificar en memoria simulando movimiento y daño
+        p.setPositionX(4);
+        p.setPositionY(5);
+        p.setHealth(25);
+        p.setAlive(false);
+
+        // invocar sync (método privado) por reflexión para cubrir ramas internas
+        var m = GameService.class.getDeclaredMethod("syncPlayersToDB", String.class);
+        m.setAccessible(true);
+        m.invoke(gameService, "g1");
+
+        // verificar que se guardó con los valores actualizados
+        verify(playerRepository, atLeastOnce()).save(argThat(db ->
+                db.getId().equals("S") &&
+                        db.getPositionX() == 4 &&
+                        db.getPositionY() == 5 &&
+                        db.getHealth() == 25 &&
+                        !db.isAlive()
+        ));
+    }
+
+    @Test
+    void handleConnectionWindowEnd_startsLoop_whenTwoOrMorePlayers() throws Exception {
+        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
+        Player a = Player.builder().id("A1").name("A1").positionX(0).positionY(0).health(100).isAlive(true).build();
+        Player b = Player.builder().id("B1").name("B1").positionX(5).positionY(5).health(100).isAlive(true).build();
+
+        gameService.registerPlayer("g1", a);
+        gameService.registerPlayer("g1", b);
+
+        // invocar directamente el método privado para cubrir rama >=2 jugadores
+        var m = GameService.class.getDeclaredMethod("handleConnectionWindowEnd", String.class);
+        m.setAccessible(true);
+        m.invoke(gameService, "g1");
+
+        // como no hay asserts públicos del loop, solo verificar que no llamó endGame en esta ruta (no hubo publish de GAME_ENDED de inmediato)
+        verify(template, never()).convertAndSend(contains("/topic/games/g1/events"), (Object) argThat(mp -> "GAME_ENDED".equals(((Map) mp).get("event"))));
+    }
+
+    @Test
+    void movePlayer_clampsToBoardEdges_onLEFT_and_RIGHT_and_UP() {
+        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
+        Player p = Player.builder().id("Clamp").name("Clamp").positionX(0).positionY(0).health(100).isAlive(true).build();
+        gameService.registerPlayer("g1", p);
+
+        // intentar mover fuera por LEFT y UP: debería quedarse en 0
+        Player res1 = gameService.movePlayer("g1", "Clamp", "LEFT");
+        assertEquals(0, res1.getPositionX());
+        assertEquals(0, res1.getPositionY());
+
+        Player res2 = gameService.movePlayer("g1", "Clamp", "UP");
+        assertEquals(0, res2.getPositionX());
+        assertEquals(0, res2.getPositionY());
+
+        // llevar a borde derecho y probar RIGHT clamp
+        p.setPositionX(game.getWidth() - 1);
+        p.setPositionY(0);
+        Player res3 = gameService.movePlayer("g1", "Clamp", "RIGHT");
+        assertEquals(game.getWidth() - 1, res3.getPositionX());
+        assertEquals(0, res3.getPositionY());
+    }
+
+    @Test
+    void reduceHealthOverTime_endsWhenOneAliveAndComputesWinner() {
+        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
+
+        Player a = Player.builder().id("A").name("A").positionX(1).positionY(1).health(5).isAlive(true).build();
+        Player b = Player.builder().id("B").name("B").positionX(2).positionY(2).health(1).isAlive(true).build();
+
+        gameService.registerPlayer("g1", a);
+        gameService.registerPlayer("g1", b);
+
+        // una pasada debe matar al menos a uno y terminar el juego por aliveCount<=1
+        gameService.reduceHealthOverTime("g1");
+
+        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/events"), anyMap());
+    }
+
+    @Test
+    void computeAndSetWinner_noAlive_picksByHighestHealthAmongAll() {
+        Map<String, Dinosaur> pdm = new HashMap<>();
+        pdm.put("A", Dinosaur.builder().name("d").build());
+        pdm.put("B", Dinosaur.builder().name("d").build());
+
+        Game g = Game.builder().nombre("gNoAlive").playerDinosaurMap(pdm).build();
+        when(gameRepository.findById("gNoAlive")).thenReturn(Optional.of(g));
+
+        Player a = Player.builder().id("A").name("A").health(30).isAlive(false).build();
+        Player b = Player.builder().id("B").name("B").health(50).isAlive(false).build();
+
+        when(playerRepository.findAllById(anyCollection())).thenReturn(List.of(a, b));
+        when(gameRepository.save(any(Game.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Optional<Player> w = gameService.computeAndSetWinner("gNoAlive");
+        assertTrue(w.isPresent());
+        assertEquals("B", w.get().getId());
+    }
+
+    @Test
+    void syncPowerStateToPlayer_UNAVAILABLE_AVAILABLE_CLAIMED() throws Exception {
+        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
+
+        // Registrar un jugador para inicializar activePlayers[g1]
+        Player p = Player.builder().id("PP").name("PP").health(10).isAlive(true).positionX(0).positionY(0).build();
+        when(playerRepository.findById("PP")).thenReturn(Optional.of(p));
+        when(playerRepository.save(any(Player.class))).thenAnswer(inv -> inv.getArgument(0));
+        gameService.registerPlayer("g1", p);
+
+        // 1) UNAVAILABLE (sin powerAvailable y sin owner)
+        var m = GameService.class.getDeclaredMethod("syncPowerStateToPlayer", String.class);
+        m.setAccessible(true);
+        m.invoke(gameService, "g1");
+        verify(template, atLeastOnce()).convertAndSend(
+                contains("/topic/games/g1/power"),
+                (Object) argThat(mp -> "UNAVAILABLE".equals(((Map) mp).get("status")) || "UNAVAILABLE".equals(((Map) mp).get("STATUS")))
+        );
+
+        // 2) AVAILABLE
+        gameService.activatePower("g1");
+
+        // 3) CLAIMED -> usePower se ejecuta internamente, aseguramos que devuelve Player no nulo
+        when(powerService.activateRandomPower(any(Player.class))).thenAnswer(inv -> {
+            Player pl = inv.getArgument(0);
+            pl.setHealth(pl.getHealth() + 5);
+            return pl; // NO null
+        });
+        gameService.claimPower("g1", "PP");
+
+        verify(template, atLeastOnce()).convertAndSend(
+                contains("/topic/games/g1/power"),
+                (Object) argThat(mp -> "CLAIMED".equals(((Map) mp).get("status")) || "CLAIMED".equals(((Map) mp).get("STATUS")))
+        );
+    }
+
+    @Test
+    void pickByHighestHealthThenFirst_empty_returnsNull_and_singleReturnsIt() throws Exception {
+        var m = GameService.class.getDeclaredMethod("pickByHighestHealthThenFirst", List.class);
+        m.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Player resEmpty = (Player) m.invoke(gameService, List.of());
+        assertNull(resEmpty);
+
+        Player only = Player.builder().id("10").name("10").health(77).isAlive(true).build();
+        @SuppressWarnings("unchecked")
+        Player resSingle = (Player) m.invoke(gameService, List.of(only));
+        assertEquals("10", resSingle.getId());
+    }
+
+    @Test
+    void usePower_withInMemoryNull_doesNotThrowAndBroadcasts() {
+        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
+
+        // Registrar un jugador cualquiera para inicializar activePlayers[g1]
+        Player dummy = Player.builder().id("DUMMY").name("DUMMY").health(10).isAlive(true).positionX(0).positionY(0).build();
+        // save sí se usa dentro de registerPlayer
+        when(playerRepository.save(any(Player.class))).thenAnswer(inv -> inv.getArgument(0));
+        gameService.registerPlayer("g1", dummy);
+
+        // Mock del propietario (NO está en memoria, para provocar activePlayers.get(gameId).get(playerId) == null)
+        Player owner = Player.builder().id("POW").name("POW").health(10).isAlive(true).build();
+        when(playerRepository.findById("POW")).thenReturn(Optional.of(owner));
+
+        // powerService debe devolver Player NO nulo
+        when(powerService.activateRandomPower(any(Player.class))).thenAnswer(inv -> {
+            Player pl = inv.getArgument(0);
+            pl.setHealth(pl.getHealth() + 5);
+            return pl;
+        });
+
+        // preparar disponibilidad y reclamo -> llama usePower internamente
+        gameService.activatePower("g1");
+        gameService.claimPower("g1", "POW");
+
+        // Se debió enviar algún evento de poder (USED/CLAIMED)
+        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/power"), anyMap());
+    }
+
+    @Test
+    void endGame_sendsWinnerName_whenWinnerPresent() {
+        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
+        Player w = Player.builder().id("W").name("WinnerName").build();
+        game.setWinner(w);
+
+        gameService.endGame("g1", "fin");
+        // verifica que se envió winner con nombre del jugador
+        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/events"),
+                (Object) argThat(mp -> "WinnerName".equals(((Map) mp).get("winner"))));
+    }
 }

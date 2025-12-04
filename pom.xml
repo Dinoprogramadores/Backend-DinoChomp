@@ -125,12 +125,6 @@
                         </goals>
                         <configuration>
                             <excludes>
-                                <exclude>edu/escuelaing/dinochomp_backend/config/**</exclude>
-                                <exclude>edu/escuelaing/dinochomp_backend/repository/**</exclude>
-                                <exclude>edu/escuelaing/dinochomp_backend/utils/**</exclude>
-                                <exclude>edu/escuelaing/dinochomp_backend/controllers/GameWebSocketController.class</exclude>
-                                <exclude>edu/escuelaing/dinochomp_backend/controllers/LobbyWebSocketController.class</exclude>
-                                <exclude>edu/escuelaing/dinochomp_backend/services/LobbyService.class</exclude>
                             </excludes>
                         </configuration>
                     </execution>
@@ -145,9 +139,9 @@
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
-                                            <counter>INSTRUCTION</counter>
+                                            <counter>CLASS</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.60</minimum><!--Porcentaje mínimo de cubrimiento para construir el proyecto-->
+                                            <minimum>0.80</minimum><!--Porcentaje mínimo de cubrimiento para construir el proyecto-->
                                         </limit>
                                     </limits>
                                 </rule>

@@ -7,7 +7,6 @@ import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerActivationtDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;

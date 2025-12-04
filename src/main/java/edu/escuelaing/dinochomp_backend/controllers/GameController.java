@@ -9,7 +9,6 @@ import edu.escuelaing.dinochomp_backend.utils.dto.game.GameRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.game.GameResponseDTO;
 import edu.escuelaing.dinochomp_backend.utils.mappers.GameMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

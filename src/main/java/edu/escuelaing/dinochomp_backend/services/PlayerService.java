@@ -4,8 +4,6 @@ import java.util.List;
 import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.concurrent.UncheckedFuture;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import edu.escuelaing.dinochomp_backend.model.game.Player;

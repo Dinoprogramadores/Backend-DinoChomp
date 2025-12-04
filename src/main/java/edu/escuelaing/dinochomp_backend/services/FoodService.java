@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import edu.escuelaing.dinochomp_backend.model.food.Food;
@@ -24,9 +23,6 @@ public class FoodService {
         return foodRepository.findById(id);
     }
 
-    public Food saveFood(Food food) {
-        return foodRepository.save(food);
-    }
 
     public boolean deleteFood(String id) {
         if (foodRepository.existsById(id)) {

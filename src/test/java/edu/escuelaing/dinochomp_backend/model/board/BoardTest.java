@@ -31,9 +31,22 @@ class BoardTest {
         assertEquals(10, board.getHeight());
         assertNotNull(board.getMap());
         assertEquals(10 * 10, board.getMap().size());
-        // Todas las celdas deben existir con valor null
         long nulls = board.getMap().values().stream().filter(v -> v == null).count();
         assertEquals(100L, nulls);
+    }
+
+    @Test
+    @DisplayName("Constructor sin argumentos deja valores por defecto")
+    void noArgsConstructorDefaults() {
+        Board empty = new Board(); // cubre Board()
+        assertNull(empty.getId());
+        assertEquals(0, empty.getWidth());
+        assertEquals(0, empty.getHeight());
+        assertNull(empty.getMap()); // Lombok no inicializa aquí
+        assertFalse(empty.isComplete());
+        // Invocar hashCode/toString aun con nulos para cubrir ramas
+        assertNotNull(empty.toString());
+        assertDoesNotThrow(empty::hashCode);
     }
 
     @Test
@@ -95,15 +108,14 @@ class BoardTest {
     @DisplayName("isNull false cuando hay un BoardItem en la celda")
     void isNullFalseWhenCellHasItem() {
         Point p = new Point(1, 1);
-        // Usamos una clase anónima para simular BoardItem
         BoardItem item = new BoardItem() {};
         board.getMap().put(p, item);
         assertFalse(board.isNull(p));
     }
 
     @Test
-    @DisplayName("Cubre equals/hashCode/toString/canEqual generados por Lombok")
-    void lombokGeneratedMethods() {
+    @DisplayName("equals/hashCode/toString/canEqual generados por Lombok - iguales")
+    void lombokGeneratedMethodsEquals() {
         Board a = Board.builder()
                 .id("id1")
                 .width(4)
@@ -120,31 +132,120 @@ class BoardTest {
                 .isComplete(false)
                 .build();
 
-        Board c = Board.builder()
-                .id("id2")
-                .width(4)
-                .height(5)
+        assertEquals(a, a);
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode()); // hashCode consistente
+        assertTrue(a.toString().contains("Board"));
+        assertTrue(a.canEqual(b));
+    }
+
+    @Test
+    @DisplayName("equals/hashCode cubren ramas cambiando cada campo")
+    void equalsAndHashCodeFieldDifferences() {
+        Board base = Board.builder()
+                .id("id1")
+                .width(2)
+                .height(3)
                 .map(new HashMap<>())
                 .isComplete(false)
                 .build();
 
-        // equals simétrico y reflexivo
-        assertEquals(a, a);
-        assertEquals(a, b);
-        assertEquals(b, a);
-        assertNotEquals(a, c);
+        // id distinto
+        Board diffId = Board.builder()
+                .id("id2")
+                .width(2).height(3)
+                .map(new HashMap<>())
+                .isComplete(false)
+                .build();
+        assertNotEquals(base, diffId);
+        diffId.hashCode(); // ejecuta rama de id !=
 
-        // hashCode consistente con equals
-        assertEquals(a.hashCode(), b.hashCode());
-        assertNotEquals(a.hashCode(), c.hashCode());
+        // width distinto
+        Board diffWidth = Board.builder()
+                .id("id1")
+                .width(99).height(3)
+                .map(new HashMap<>())
+                .isComplete(false)
+                .build();
+        assertNotEquals(base, diffWidth);
+        diffWidth.hashCode();
 
-        // toString no debe ser vacío y debe contener el nombre de la clase
-        assertTrue(a.toString().contains("Board"));
+        // height distinto
+        Board diffHeight = Board.builder()
+                .id("id1")
+                .width(2).height(99)
+                .map(new HashMap<>())
+                .isComplete(false)
+                .build();
+        assertNotEquals(base, diffHeight);
+        diffHeight.hashCode();
 
-        // canEqual: verifica tipo distinto
-        Object otherType = new Object();
-        assertFalse(a.canEqual(otherType));
-        assertTrue(a.canEqual(b));
+        // isComplete distinto
+        Board diffComplete = Board.builder()
+                .id("id1")
+                .width(2).height(3)
+                .map(new HashMap<>())
+                .isComplete(true)
+                .build();
+        assertNotEquals(base, diffComplete);
+        diffComplete.hashCode();
+
+        // map distinto (contenido)
+        Map<Point, BoardItem> populated = new HashMap<>();
+        populated.put(new Point(0,0), new BoardItem() {});
+        Board diffMapContent = Board.builder()
+                .id("id1")
+                .width(2).height(3)
+                .map(populated)
+                .isComplete(false)
+                .build();
+        assertNotEquals(base, diffMapContent);
+        diffMapContent.hashCode();
+
+        // map null vs no null (rama map == null)
+        Board nullMap = Board.builder()
+                .id("id1")
+                .width(2).height(3)
+                .map(null)
+                .isComplete(false)
+                .build();
+        assertNotEquals(base, nullMap);
+        nullMap.hashCode();
+
+        // id null vs no null (rama id == null)
+        Board nullId = Board.builder()
+                .id(null)
+                .width(2).height(3)
+                .map(new HashMap<>())
+                .isComplete(false)
+                .build();
+        assertNotEquals(base, nullId);
+        nullId.hashCode();
+
+        // ambos nulos en el mismo campo ⇒ iguales
+        Board bothNullId = Board.builder()
+                .id(null)
+                .width(2).height(3)
+                .map(new HashMap<>())
+                .isComplete(false)
+                .build();
+        assertEquals(nullId, bothNullId);
+        assertEquals(nullId.hashCode(), bothNullId.hashCode());
+
+        Board bothNullMapA = Board.builder()
+                .id("idX")
+                .width(2).height(3)
+                .map(null)
+                .isComplete(false)
+                .build();
+        Board bothNullMapB = Board.builder()
+                .id("idX")
+                .width(2).height(3)
+                .map(null)
+                .isComplete(false)
+                .build();
+        assertEquals(bothNullMapA, bothNullMapB);
+        assertEquals(bothNullMapA.hashCode(), bothNullMapB.hashCode());
     }
 
     @Nested
@@ -173,7 +274,6 @@ class BoardTest {
         @ParameterizedTest(name = "isNull true en borde válido {0} cuando la celda es null")
         @MethodSource("validPoints")
         void isNullTrueOnValidBoundaries(Point p) {
-            // En el constructor, todas son null
             assertTrue(board.isNull(p));
         }
 
