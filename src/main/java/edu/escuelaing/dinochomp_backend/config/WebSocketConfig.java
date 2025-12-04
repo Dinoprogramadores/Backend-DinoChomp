@@ -29,11 +29,24 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
 
-        // Registrar listener para todos los canales de juego
+        registry.addEndpoint("/ws/lobbies")
+                .setAllowedOriginPatterns("*")
+                .withSockJS()
+                .setSessionCookieNeeded(true)
+                .setStreamBytesLimit(512 * 1024)
+                .setHttpMessageCacheSize(1000)
+                .setDisconnectDelay(30 * 1000);
+
+        registry.addEndpoint("/ws/games")
+                .setAllowedOriginPatterns("*")
+                .withSockJS()
+                .setSessionCookieNeeded(true)
+                .setStreamBytesLimit(512 * 1024)
+                .setHttpMessageCacheSize(1000)
+                .setDisconnectDelay(30 * 1000);
+
+        // Redis listeners
         redisMessageListenerContainer.addMessageListener(
                 redisMessageListener,
                 new PatternTopic("game:*")
