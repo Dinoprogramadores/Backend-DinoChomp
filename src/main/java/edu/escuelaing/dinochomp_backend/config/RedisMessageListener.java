@@ -33,8 +33,17 @@ public class RedisMessageListener implements MessageListener {
                 String gameId = parts[1];
                 String channelType = parts[2];
 
-                // Mapear correctamente el topic
-                String wsTopic = "/topic/" + type + "s/" + gameId + "/" + channelType;
+                // 🔧 FIX: Mapear correctamente el plural
+                String pluralType;
+                if ("lobby".equals(type)) {
+                    pluralType = "lobbies";
+                } else if ("game".equals(type)) {
+                    pluralType = "games";
+                } else {
+                    pluralType = type + "s";
+                }
+
+                String wsTopic = "/topic/" + pluralType + "/" + gameId + "/" + channelType;
 
                 Object messageObject = objectMapper.readValue(payload, Object.class);
                 template.convertAndSend(wsTopic, messageObject);
