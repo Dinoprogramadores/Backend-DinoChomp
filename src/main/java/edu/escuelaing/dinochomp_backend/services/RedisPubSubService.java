@@ -1,5 +1,6 @@
 package edu.escuelaing.dinochomp_backend.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -16,10 +17,17 @@ public class RedisPubSubService {
     @Autowired
     private SimpMessagingTemplate template;
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     public void publishEvent(String type, String gameId, String channel, Object message) {
         String redisChannel = type + ":" + gameId + ":" + channel;
-        redisTemplate.convertAndSend(redisChannel, message);
-        log.info("Evento publicado en Redis: {}", redisChannel);
+        try {
+            String jsonMessage = objectMapper.writeValueAsString(message);
+            redisTemplate.convertAndSend(redisChannel, jsonMessage);
+            log.info("Evento publicado en Redis: {} - Mensaje: {}", redisChannel, jsonMessage);
+        } catch (Exception e) {
+            log.error("Error serializando mensaje para Redis", e);
+        }
     }
 
     public void publishGameEvent(String gameId, String channel, Object message) {

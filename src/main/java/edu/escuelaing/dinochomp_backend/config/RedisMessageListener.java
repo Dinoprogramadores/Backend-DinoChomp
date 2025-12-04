@@ -19,6 +19,11 @@ public class RedisMessageListener implements MessageListener {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final Map<String, String> PLURAL_MAP = Map.of(
+            "lobby", "lobbies",
+            "game", "games"
+    );
+
     @Override
     public void onMessage(Message message, byte[] pattern) {
         try {
@@ -26,6 +31,7 @@ public class RedisMessageListener implements MessageListener {
             String payload = new String(message.getBody());
 
             log.info("Mensaje recibido de Redis en canal: {}", channel);
+            log.info("Payload recibido: {}", payload);
 
             String[] parts = channel.split(":");
             if (parts.length >= 3) {
@@ -33,19 +39,12 @@ public class RedisMessageListener implements MessageListener {
                 String gameId = parts[1];
                 String channelType = parts[2];
 
-                // 🔧 FIX: Mapear correctamente el plural
-                String pluralType;
-                if ("lobby".equals(type)) {
-                    pluralType = "lobbies";
-                } else if ("game".equals(type)) {
-                    pluralType = "games";
-                } else {
-                    pluralType = type + "s";
-                }
-
+                String pluralType = PLURAL_MAP.getOrDefault(type, type + "s");
                 String wsTopic = "/topic/" + pluralType + "/" + gameId + "/" + channelType;
 
                 Object messageObject = objectMapper.readValue(payload, Object.class);
+                log.info("Objeto parseado: {}", messageObject);
+
                 template.convertAndSend(wsTopic, messageObject);
 
                 log.info("Mensaje reenviado a WebSocket: {}", wsTopic);
