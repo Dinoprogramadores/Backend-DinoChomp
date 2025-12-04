@@ -33,17 +33,17 @@ public class LobbyWebSocketController {
         lobbyService.addPlayer(gameId, player);
 
         log.info("Enviando lista de jugadores actualizada: {}", lobbyService.getPlayers(gameId));
-        redisPubSubService.publishGameEvent(gameId, "players", lobbyService.getPlayers(gameId));
+        redisPubSubService.publishLobbyEvent(gameId, "players", lobbyService.getPlayers(gameId));
     }
 
     @MessageMapping("/lobbies/{gameId}/leave")
     public void leaveLobby(@DestinationVariable String gameId, @Payload Player player) {
         lobbyService.removePlayer(gameId, player.getId());
-        redisPubSubService.publishGameEvent(gameId, "players", lobbyService.getPlayers(gameId));
+        redisPubSubService.publishLobbyEvent(gameId, "players", lobbyService.getPlayers(gameId));
     }
 
     @MessageMapping("/lobbies/{gameId}/start")
     public void startGame(@DestinationVariable String gameId) {
-        redisPubSubService.publishGameEvent(gameId, "start", "Game starting...");
+        redisPubSubService.publishLobbyEvent(gameId, "start", "Game starting...");
     }
 }

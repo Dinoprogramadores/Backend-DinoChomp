@@ -20,7 +20,7 @@ public class LobbyService {
     public void addPlayer(String gameId, Player player) {
         List<Player> players = lobbies.computeIfAbsent(gameId, k -> new ArrayList<>());
         players.add(player);
-        redisPubSubService.publishGameEvent(gameId, "players", players);
+        redisPubSubService.publishLobbyEvent(gameId, "players", players);
         log.info("Jugador {} agregado al lobby {}", player.getId(), gameId);
     }
 
@@ -31,7 +31,7 @@ public class LobbyService {
         });
 
         if (updatedPlayers != null) {
-            redisPubSubService.publishGameEvent(gameId, "players", updatedPlayers);
+            redisPubSubService.publishLobbyEvent(gameId, "players", updatedPlayers);
             log.info("Jugador {} removido del lobby {}", playerId, gameId);
         }
     }
