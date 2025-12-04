@@ -38,5 +38,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 redisMessageListener,
                 new PatternTopic("game:*")
         );
+        redisMessageListenerContainer.addMessageListener(
+                redisMessageListener,
+                new PatternTopic("lobby:*")
+        );
     }
 }

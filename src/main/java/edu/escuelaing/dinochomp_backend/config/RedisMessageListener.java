@@ -27,16 +27,15 @@ public class RedisMessageListener implements MessageListener {
 
             log.info("Mensaje recibido de Redis en canal: {}", channel);
 
-            // Extraer gameId y tipo de canal
             String[] parts = channel.split(":");
             if (parts.length >= 3) {
+                String type = parts[0];  // "game" o "lobby"
                 String gameId = parts[1];
                 String channelType = parts[2];
 
-                // Convertir a WebSocket topic
-                String wsTopic = "/topic/games/" + gameId + "/" + channelType;
+                // Mapear correctamente el topic
+                String wsTopic = "/topic/" + type + "s/" + gameId + "/" + channelType;
 
-                // Enviar a todos los clientes WebSocket suscritos
                 Object messageObject = objectMapper.readValue(payload, Object.class);
                 template.convertAndSend(wsTopic, messageObject);
 

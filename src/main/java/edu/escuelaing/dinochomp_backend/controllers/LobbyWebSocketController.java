@@ -2,12 +2,12 @@ package edu.escuelaing.dinochomp_backend.controllers;
 
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.services.LobbyService;
+import edu.escuelaing.dinochomp_backend.services.RedisPubSubService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -18,7 +18,7 @@ public class LobbyWebSocketController {
     private LobbyService lobbyService;
 
     @Autowired
-    private SimpMessagingTemplate template;
+    private RedisPubSubService redisPubSubService;
 
     private static final String TOPIC = "/topic/lobbies/";
 
@@ -33,20 +33,17 @@ public class LobbyWebSocketController {
         lobbyService.addPlayer(gameId, player);
 
         log.info("Enviando lista de jugadores actualizada: {}", lobbyService.getPlayers(gameId));
-        template.convertAndSend(TOPIC + gameId + "/players",
-                lobbyService.getPlayers(gameId));
+        redisPubSubService.publishGameEvent(gameId, "players", lobbyService.getPlayers(gameId));
     }
-
 
     @MessageMapping("/lobbies/{gameId}/leave")
     public void leaveLobby(@DestinationVariable String gameId, @Payload Player player) {
         lobbyService.removePlayer(gameId, player.getId());
-        template.convertAndSend(TOPIC + gameId + "/players",
-                lobbyService.getPlayers(gameId));
+        redisPubSubService.publishGameEvent(gameId, "players", lobbyService.getPlayers(gameId));
     }
 
     @MessageMapping("/lobbies/{gameId}/start")
     public void startGame(@DestinationVariable String gameId) {
-        template.convertAndSend(TOPIC + gameId + "/start", "Game starting...");
+        redisPubSubService.publishGameEvent(gameId, "start", "Game starting...");
     }
 }
