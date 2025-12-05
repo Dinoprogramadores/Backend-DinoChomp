@@ -2,6 +2,7 @@ package edu.escuelaing.dinochomp_backend.controllers;
 
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.services.GameService;
+import edu.escuelaing.dinochomp_backend.services.RedisPubSubService;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerMoveMessage;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerActivationtDTO;
@@ -21,20 +22,18 @@ public class GameWebSocketController {
     private GameService gameService;
 
     @Autowired
-    private SimpMessagingTemplate template;
-
-    private static final String TOPIC = "/topic/games/";
+    private RedisPubSubService redisPubSubService;
 
     @MessageMapping("/games/{gameId}/start")
     public void startGame(@DestinationVariable String gameId) {
         gameService.startGameLoop(gameId);
-        template.convertAndSend(TOPIC + gameId + "/status", "Game started!");
+        redisPubSubService.publishGameEvent(gameId, "status", "Game started!");
     }
 
     @MessageMapping("/games/{gameId}/stop")
     public void stopGame(@DestinationVariable String gameId) {
         gameService.stopGameLoop(gameId);
-        template.convertAndSend(TOPIC + gameId + "/status", "Game stopped!");
+        redisPubSubService.publishGameEvent(gameId, "status", "Game stopped!");
     }
 
     @MessageMapping("/games/{gameId}/power/claim")
@@ -66,7 +65,7 @@ public class GameWebSocketController {
                 .isAlive(updated.isAlive())
                 .build();
 
-        template.convertAndSend(TOPIC + gameId + "/players", dto);
+        redisPubSubService.publishGameEvent(gameId, "players", dto);
     }
 
     @MessageMapping("/games/{gameId}/join")
@@ -76,6 +75,7 @@ public class GameWebSocketController {
         return;
         }
         gameService.registerPlayer(gameId, player);
+        redisPubSubService.publishGameEvent(gameId, "player-joined", player);
     }
 
     
