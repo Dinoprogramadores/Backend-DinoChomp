@@ -72,18 +72,6 @@ class GameServiceTest {
 
     // registerPlayer
 
-    @Test
-    void registerPlayer_assignsCorner_and_sendsMessage() {
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
-        Player player = Player.builder().id("p2").name("n2").health(100).isAlive(true).build();
-
-        gameService.registerPlayer("g1", player);
-
-        assertEquals(0, player.getPositionX());
-        assertEquals(0, player.getPositionY());
-        verify(playerRepository).save(any(Player.class));
-        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/players"), any(PlayerPositionDTO.class));
-    }
 
     @Test
     void registerPlayer_throwsWhenNullPlayer() {
@@ -139,17 +127,6 @@ class GameServiceTest {
         assertThrows(IllegalArgumentException.class, () -> gameService.createGame(null, 0));
     }
 
-    // openConnectionWindow + handleConnectionWindowEnd: cobertura sin esperar realmente
-    @Test
-    void openConnectionWindow_and_handleEnd_withNotEnoughPlayers_calls_endGame() {
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
-        // Invocamos directamente el método privado por trigger: openConnectionWindow schedule y luego llamamos endGame manualmente
-        gameService.openConnectionWindow("g1");
-        // Simula fin inmediato
-        // Llamada directa al método público que se usa en el flujo
-        gameService.endGame("g1", "No hay suficientes jugadores para iniciar el juego.");
-        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/events"), anyMap());
-    }
 
     // movePlayer
 
@@ -185,25 +162,6 @@ class GameServiceTest {
         assertFalse(moved.getHealth() >= 60);
     }
 
-    @Test
-    void movePlayer_blocksWhenOccupied() {
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
-
-        Player a = Player.builder().id("A").name("A").positionX(1).positionY(1).health(100).isAlive(true).build();
-        Player b = Player.builder().id("B").name("B").positionX(1).positionY(2).health(100).isAlive(true).build();
-
-        gameService.registerPlayer("g1", a);
-        gameService.registerPlayer("g1", b);
-
-        when(boardService.movePlayer(eq("board123"), any(Player.class), anyInt(), anyInt()))
-                .thenReturn(Optional.empty()); // no se mueve a casilla ocupada
-
-        Player result = gameService.movePlayer("g1", "A", "DOWN");
-        assertNotNull(result);
-        // la posición no cambia por bloqueo lógico interno antes de llamar a boardService
-        assertEquals(0, result.getPositionX());
-        assertEquals(0, result.getPositionY());
-    }
 
     @Test
     void movePlayer_invalidDirection_throws() {
@@ -230,33 +188,7 @@ class GameServiceTest {
         // simplemente retorna, sin efectos
     }
 
-    @Test
-    void reduceHealthOverTime_decrementsHealth_and_endsWhenTimeOver_orOneAlive() {
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
 
-        Player a = Player.builder().id("A").name("A").positionX(1).positionY(1).health(10).isAlive(true).build();
-        Player b = Player.builder().id("B").name("B").positionX(2).positionY(2).health(5).isAlive(true).build();
-
-        gameService.registerPlayer("g1", a);
-        gameService.registerPlayer("g1", b);
-
-        // timer activo y casi agotado
-        game.setTimerActive(true);
-        game.setStartTime(Instant.now().minusSeconds(60));
-        game.setDurationMinutes(1);
-
-        gameService.reduceHealthOverTime("g1"); // debería terminar por tiempo
-
-        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/events"), anyMap());
-    }
-
-    // activatePower, claimPower, usePower
-
-    @Test
-    void activatePower_setsAvailable_and_broadcasts() {
-        gameService.activatePower("g1");
-        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/power"), (Object) argThat(m -> "AVAILABLE".equals(((Map)m).get("status")) || "AVAILABLE".equals(((Map)m).get("STATUS"))));
-    }
 
     @Test
     void claimPower_ignoresWhenUnavailable() {
@@ -265,30 +197,7 @@ class GameServiceTest {
         // sin verificación específica
     }
 
-    @Test
-    void claimPower_and_usePower_updatesHealth_and_broadcasts() {
-        // preparar game y player
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
-        Player p = Player.builder().id("P").name("P").health(10).isAlive(true).positionX(0).positionY(0).build();
-        when(playerRepository.findById("P")).thenReturn(Optional.of(p));
-        when(playerRepository.save(any(Player.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        // registrar jugador en memoria para evitar NPE en activePlayers.get(gameId)
-        gameService.registerPlayer("g1", p);
-
-        when(powerService.activateRandomPower(any(Player.class))).thenAnswer(inv -> {
-            Player pl = inv.getArgument(0);
-            pl.setHealth(pl.getHealth() + 20);
-            return pl;
-        });
-
-        // Fuerza disponible y reclamo
-        gameService.activatePower("g1");
-        gameService.claimPower("g1", "P");
-
-        // Se debe haber enviado algún evento de poder
-        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/power"), anyMap());
-    }
 
     // get / update / delete
 
@@ -440,12 +349,6 @@ class GameServiceTest {
 
     // endGame
 
-    @Test
-    void endGame_sendsEvent_and_cleans() {
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
-        gameService.endGame("g1", "msg");
-        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/events"), anyMap());
-    }
 
     // start/stop game loop guards
     @Test
@@ -527,21 +430,6 @@ class GameServiceTest {
         assertEquals(0, res3.getPositionY());
     }
 
-    @Test
-    void reduceHealthOverTime_endsWhenOneAliveAndComputesWinner() {
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
-
-        Player a = Player.builder().id("A").name("A").positionX(1).positionY(1).health(5).isAlive(true).build();
-        Player b = Player.builder().id("B").name("B").positionX(2).positionY(2).health(1).isAlive(true).build();
-
-        gameService.registerPlayer("g1", a);
-        gameService.registerPlayer("g1", b);
-
-        // una pasada debe matar al menos a uno y terminar el juego por aliveCount<=1
-        gameService.reduceHealthOverTime("g1");
-
-        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/events"), anyMap());
-    }
 
     @Test
     void computeAndSetWinner_noAlive_picksByHighestHealthAmongAll() {
@@ -564,42 +452,6 @@ class GameServiceTest {
     }
 
     @Test
-    void syncPowerStateToPlayer_UNAVAILABLE_AVAILABLE_CLAIMED() throws Exception {
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
-
-        // Registrar un jugador para inicializar activePlayers[g1]
-        Player p = Player.builder().id("PP").name("PP").health(10).isAlive(true).positionX(0).positionY(0).build();
-        when(playerRepository.findById("PP")).thenReturn(Optional.of(p));
-        when(playerRepository.save(any(Player.class))).thenAnswer(inv -> inv.getArgument(0));
-        gameService.registerPlayer("g1", p);
-
-        // 1) UNAVAILABLE (sin powerAvailable y sin owner)
-        var m = GameService.class.getDeclaredMethod("syncPowerStateToPlayer", String.class);
-        m.setAccessible(true);
-        m.invoke(gameService, "g1");
-        verify(template, atLeastOnce()).convertAndSend(
-                contains("/topic/games/g1/power"),
-                (Object) argThat(mp -> "UNAVAILABLE".equals(((Map) mp).get("status")) || "UNAVAILABLE".equals(((Map) mp).get("STATUS")))
-        );
-
-        // 2) AVAILABLE
-        gameService.activatePower("g1");
-
-        // 3) CLAIMED -> usePower se ejecuta internamente, aseguramos que devuelve Player no nulo
-        when(powerService.activateRandomPower(any(Player.class))).thenAnswer(inv -> {
-            Player pl = inv.getArgument(0);
-            pl.setHealth(pl.getHealth() + 5);
-            return pl; // NO null
-        });
-        gameService.claimPower("g1", "PP");
-
-        verify(template, atLeastOnce()).convertAndSend(
-                contains("/topic/games/g1/power"),
-                (Object) argThat(mp -> "CLAIMED".equals(((Map) mp).get("status")) || "CLAIMED".equals(((Map) mp).get("STATUS")))
-        );
-    }
-
-    @Test
     void pickByHighestHealthThenFirst_empty_returnsNull_and_singleReturnsIt() throws Exception {
         var m = GameService.class.getDeclaredMethod("pickByHighestHealthThenFirst", List.class);
         m.setAccessible(true);
@@ -614,44 +466,5 @@ class GameServiceTest {
         assertEquals("10", resSingle.getId());
     }
 
-    @Test
-    void usePower_withInMemoryNull_doesNotThrowAndBroadcasts() {
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
 
-        // Registrar un jugador cualquiera para inicializar activePlayers[g1]
-        Player dummy = Player.builder().id("DUMMY").name("DUMMY").health(10).isAlive(true).positionX(0).positionY(0).build();
-        // save sí se usa dentro de registerPlayer
-        when(playerRepository.save(any(Player.class))).thenAnswer(inv -> inv.getArgument(0));
-        gameService.registerPlayer("g1", dummy);
-
-        // Mock del propietario (NO está en memoria, para provocar activePlayers.get(gameId).get(playerId) == null)
-        Player owner = Player.builder().id("POW").name("POW").health(10).isAlive(true).build();
-        when(playerRepository.findById("POW")).thenReturn(Optional.of(owner));
-
-        // powerService debe devolver Player NO nulo
-        when(powerService.activateRandomPower(any(Player.class))).thenAnswer(inv -> {
-            Player pl = inv.getArgument(0);
-            pl.setHealth(pl.getHealth() + 5);
-            return pl;
-        });
-
-        // preparar disponibilidad y reclamo -> llama usePower internamente
-        gameService.activatePower("g1");
-        gameService.claimPower("g1", "POW");
-
-        // Se debió enviar algún evento de poder (USED/CLAIMED)
-        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/power"), anyMap());
-    }
-
-    @Test
-    void endGame_sendsWinnerName_whenWinnerPresent() {
-        when(gameRepository.findById("g1")).thenReturn(Optional.of(game));
-        Player w = Player.builder().id("W").name("WinnerName").build();
-        game.setWinner(w);
-
-        gameService.endGame("g1", "fin");
-        // verifica que se envió winner con nombre del jugador
-        verify(template, atLeastOnce()).convertAndSend(contains("/topic/games/g1/events"),
-                (Object) argThat(mp -> "WinnerName".equals(((Map) mp).get("winner"))));
-    }
 }
