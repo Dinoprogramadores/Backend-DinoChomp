@@ -46,13 +46,12 @@ public class GameService {
     private final Map<String, ScheduledFuture<?>> syncLoops = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> connectionWindows = new ConcurrentHashMap<>();
 
-    private static final String TOPIC= "/topic/games/";
+    private static final String TOPIC = "/topic/games/";
     private static final String PLAYERS = "/players";
     private static final String STATUS = "status";
     private static final String OWNER = "owner";
     private static final String TIMESTAMP = "timestamp";
     private static final String POWER = "/power";
-
 
     public synchronized void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
@@ -106,7 +105,7 @@ public class GameService {
                 player.getHealth(),
                 player.isAlive());
 
-        redisPubSubService.publishGameEvent(gameId, "players", dto);
+        publishEncryptedEvent(gameId, "players", dto);
 
         syncPowerStateToPlayer(gameId);
     }
@@ -129,9 +128,8 @@ public class GameService {
         payload.put(OWNER, currentOwner);
         payload.put(TIMESTAMP, Instant.now().toString());
 
-        redisPubSubService.publishGameEvent(gameId, "power", payload);
 
-        redisPubSubService.publishGameEvent(gameId, "power", payload);
+        publishEncryptedEvent(gameId, "power", payload);
 
         log.info("Estado del poder sincronizado para juego {}: {}", gameId, status);
     }
@@ -144,22 +142,19 @@ public class GameService {
         // LOOP 1: vida por segundo
         ScheduledFuture<?> hLoop = scheduler.scheduleAtFixedRate(
                 () -> reduceHealthOverTime(gameId),
-                0, 2, TimeUnit.SECONDS
-        );
+                0, 2, TimeUnit.SECONDS);
         healthLoops.put(gameId, hLoop);
 
         // LOOP 2: poderes
         ScheduledFuture<?> pLoop = scheduler.scheduleAtFixedRate(
                 () -> activatePower(gameId),
-                10, 10, TimeUnit.SECONDS
-        );
+                10, 10, TimeUnit.SECONDS);
         powerLoops.put(gameId, pLoop);
 
         // LOOP 3: sincronizar
         ScheduledFuture<?> sLoop = scheduler.scheduleAtFixedRate(
                 () -> syncPlayersToDB(gameId),
-                0, 2, TimeUnit.SECONDS
-        );
+                0, 2, TimeUnit.SECONDS);
         syncLoops.put(gameId, sLoop);
     }
 
@@ -226,7 +221,7 @@ public class GameService {
             foodEvent.put("id", food.getId());
             foodEvent.put("x", food.getPositionX());
             foodEvent.put("y", food.getPositionY());
-            redisPubSubService.publishGameEvent(gameId, "food", foodEvent);
+            publishEncryptedEvent(gameId, "food", foodEvent);
         });
 
         PlayerPositionDTO dto = new PlayerPositionDTO(
@@ -235,10 +230,9 @@ public class GameService {
                 player.getPositionX(),
                 player.getPositionY(),
                 player.getHealth(),
-                player.isAlive()
-        );
+                player.isAlive());
 
-        redisPubSubService.publishGameEvent(gameId, "players", dto);
+        publishEncryptedEvent(gameId, "players", dto);
 
         return player;
     }
@@ -265,7 +259,7 @@ public class GameService {
                         player.getHealth(),
                         player.isAlive());
 
-                redisPubSubService.publishGameEvent(gameId, "players", dto);
+                publishEncryptedEvent(gameId, "players", dto); 
 
             }
         }
@@ -299,7 +293,7 @@ public class GameService {
         payload.put(OWNER, null);
         payload.put(TIMESTAMP, Instant.now().toString());
 
-        redisPubSubService.publishGameEvent(gameId, "power", payload);
+        publishEncryptedEvent(gameId, "power", payload);
     }
 
     public synchronized void claimPower(String gameId, String playerId) {
@@ -315,7 +309,7 @@ public class GameService {
         payload.put(OWNER, playerId);
         payload.put(TIMESTAMP, Instant.now().toString());
 
-        redisPubSubService.publishGameEvent(gameId, "power", payload);
+        publishEncryptedEvent(gameId, "power", payload);
 
     }
 
@@ -345,7 +339,7 @@ public class GameService {
         payload.put(OWNER, playerId);
         payload.put(TIMESTAMP, Instant.now().toString());
 
-        redisPubSubService.publishGameEvent(gameId, "power", payload);
+        publishEncryptedEvent(gameId, "power", payload);
     }
 
     public Game createGame(Game game, int totalFood) {
@@ -367,7 +361,8 @@ public class GameService {
 
     public void openConnectionWindow(String gameId) {
         long CONNECTION_WINDOW_SECONDS = 30;
-        ScheduledFuture<?> timer = scheduler.schedule(() -> handleConnectionWindowEnd(gameId), CONNECTION_WINDOW_SECONDS, TimeUnit.SECONDS);
+        ScheduledFuture<?> timer = scheduler.schedule(() -> handleConnectionWindowEnd(gameId),
+                CONNECTION_WINDOW_SECONDS, TimeUnit.SECONDS);
 
         connectionWindows.put(gameId, timer);
     }
@@ -605,7 +600,8 @@ public class GameService {
 
         for (Player mem : players.values()) {
             Player db = playerRepository.findById(mem.getId()).orElse(null);
-            if (db == null) continue;
+            if (db == null)
+                continue;
 
             db.setPositionX(mem.getPositionX());
             db.setPositionY(mem.getPositionY());
@@ -626,7 +622,8 @@ public class GameService {
         log.info("Juego finalizado: {}", message);
         String winner = (game.getWinner() != null) ? game.getWinner().getName() : "Ninguno";
 
-        redisPubSubService.publishGameEvent(gameId, "events", Map.of("event", "GAME_ENDED", "winner", winner));
+        Map<String, Object> payload = Map.of("event", "GAME_ENDED", "winner", winner);
+        publishEncryptedEvent(gameId, "events", payload);
         stopGameLoop(gameId);
 
         activePlayers.remove(gameId);
@@ -635,4 +632,18 @@ public class GameService {
 
         log.info("Partida {} finalizada correctamente", gameId);
     }
+
+    private void publishEncryptedEvent(String gameId, String topic, Object payload) {
+        try {
+            String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(payload);
+            AesCrypto.Encrypted encrypted = AesCrypto.encrypt(json);
+            Map<String, String> encryptedPayload = Map.of(
+                    "iv", encrypted.iv(),
+                    "ciphertext", encrypted.ciphertext());
+            redisPubSubService.publishGameEvent(gameId, topic, encryptedPayload);
+        } catch (Exception e) {
+            log.error("❌ Error cifrando payload para topic {} en juego {}", topic, gameId, e);
+        }
+    }
+
 }

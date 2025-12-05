@@ -45,7 +45,7 @@ public class RedisMessageListener implements MessageListener {
                 Object messageObject = objectMapper.readValue(payload, Object.class);
                 log.info("Objeto parseado: {}", messageObject);
 
-                template.convertAndSend(wsTopic, messageObject);
+                template.convertAndSend(wsTopic, payload);
 
                 log.info("Mensaje reenviado a WebSocket: {}", wsTopic);
             }
