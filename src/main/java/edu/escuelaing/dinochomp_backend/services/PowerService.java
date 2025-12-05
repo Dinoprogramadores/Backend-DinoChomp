@@ -5,7 +5,7 @@ import edu.escuelaing.dinochomp_backend.model.power.HealthPower;
 import edu.escuelaing.dinochomp_backend.model.power.Power;
 import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 import edu.escuelaing.dinochomp_backend.repository.PowerRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -15,11 +15,11 @@ import java.util.Random;
 import java.util.function.Supplier;
 
 @Service
+@RequiredArgsConstructor
 public class PowerService {
-    @Autowired
-    private PowerRepository powerRepository;
-    @Autowired
-    private PlayerRepository playerRepository;
+
+    private final PowerRepository powerRepository;
+    private final PlayerRepository playerRepository;
 
     // Lista de poderes disponibles
     private final List<Supplier<Power>> powerPool =

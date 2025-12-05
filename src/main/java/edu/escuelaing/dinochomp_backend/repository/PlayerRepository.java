@@ -9,7 +9,5 @@ import java.util.Optional;
 @Repository
 public interface PlayerRepository extends MongoRepository<Player,String> {
 
-    Optional<Player> findById(String id);
-
     Optional<Player> findByEmail(String email);
 }

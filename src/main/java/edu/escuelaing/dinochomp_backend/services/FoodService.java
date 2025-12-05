@@ -3,16 +3,17 @@ package edu.escuelaing.dinochomp_backend.services;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import edu.escuelaing.dinochomp_backend.model.food.Food;
 import edu.escuelaing.dinochomp_backend.repository.FoodRepository;
 
 @Service
+@RequiredArgsConstructor
 public class FoodService {
-    @Autowired
-    private FoodRepository foodRepository;  
+
+    private final FoodRepository foodRepository;
 
     public List<Food> getAllFoods() {
         return foodRepository.findAll();
@@ -22,9 +23,6 @@ public class FoodService {
         return foodRepository.findById(id);
     }
 
-    public Food saveFood(Food food) {
-        return foodRepository.save(food);
-    }
 
     public boolean deleteFood(String id) {
         if (foodRepository.existsById(id)) {

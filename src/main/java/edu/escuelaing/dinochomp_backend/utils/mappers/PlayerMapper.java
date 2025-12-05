@@ -1,6 +1,5 @@
 package edu.escuelaing.dinochomp_backend.utils.mappers;
 
-import edu.escuelaing.dinochomp_backend.model.dinosaur.Dinosaur;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerRequestDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerResponseDTO;

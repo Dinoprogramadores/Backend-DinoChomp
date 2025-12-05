@@ -3,17 +3,17 @@ package edu.escuelaing.dinochomp_backend.services;
 import java.util.List;
 import java.util.Optional;
 
-import org.apache.commons.lang3.concurrent.UncheckedFuture;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.repository.PlayerRepository;
 
 @Service
+@RequiredArgsConstructor
 public class PlayerService {
-    @Autowired
-    private PlayerRepository playerRepository;
+
+    private final PlayerRepository playerRepository;
 
     public Optional<Player> getPlayerById(String id) {
         return playerRepository.findById(id);

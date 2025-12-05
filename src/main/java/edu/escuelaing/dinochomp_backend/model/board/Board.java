@@ -15,6 +15,7 @@ import java.util.*;
 @AllArgsConstructor
 @Document(collection = "Boards")
 @Getter
+@Builder
 @Setter
 public class Board implements Serializable {
 
