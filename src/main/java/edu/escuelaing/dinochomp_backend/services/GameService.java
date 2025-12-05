@@ -34,6 +34,8 @@ public class GameService {
     private BoardService boardService;
     @Autowired
     private PowerService powerService;
+    @Autowired
+    private RedisPubSubService redisPubSubService;
 
     private final Map<String, Map<String, Player>> activePlayers = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
@@ -44,13 +46,12 @@ public class GameService {
     private final Map<String, ScheduledFuture<?>> syncLoops = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> connectionWindows = new ConcurrentHashMap<>();
 
-    private static final String TOPIC= "/topic/games/";
+    private static final String TOPIC = "/topic/games/";
     private static final String PLAYERS = "/players";
     private static final String STATUS = "status";
     private static final String OWNER = "owner";
     private static final String TIMESTAMP = "timestamp";
     private static final String POWER = "/power";
-
 
     public synchronized void registerPlayer(String gameId, Player player) {
         if (player == null || player.getId() == null) {
@@ -104,10 +105,10 @@ public class GameService {
                 player.getHealth(),
                 player.isAlive());
 
-        template.convertAndSend(TOPIC + gameId + PLAYERS, dto);
+        publishEncryptedEvent(gameId, "players", dto);
+
         syncPowerStateToPlayer(gameId);
     }
-
 
     private void syncPowerStateToPlayer(String gameId) {
         Boolean isPowerAvailable = powerAvailable.get(gameId);
@@ -127,7 +128,8 @@ public class GameService {
         payload.put(OWNER, currentOwner);
         payload.put(TIMESTAMP, Instant.now().toString());
 
-        template.convertAndSend(TOPIC + gameId + POWER, payload);
+
+        publishEncryptedEvent(gameId, "power", payload);
 
         log.info("Estado del poder sincronizado para juego {}: {}", gameId, status);
     }
@@ -140,22 +142,19 @@ public class GameService {
         // LOOP 1: vida por segundo
         ScheduledFuture<?> hLoop = scheduler.scheduleAtFixedRate(
                 () -> reduceHealthOverTime(gameId),
-                0, 2, TimeUnit.SECONDS
-        );
+                0, 2, TimeUnit.SECONDS);
         healthLoops.put(gameId, hLoop);
 
         // LOOP 2: poderes
         ScheduledFuture<?> pLoop = scheduler.scheduleAtFixedRate(
                 () -> activatePower(gameId),
-                10, 10, TimeUnit.SECONDS
-        );
+                10, 10, TimeUnit.SECONDS);
         powerLoops.put(gameId, pLoop);
 
         // LOOP 3: sincronizar
         ScheduledFuture<?> sLoop = scheduler.scheduleAtFixedRate(
                 () -> syncPlayersToDB(gameId),
-                0, 2, TimeUnit.SECONDS
-        );
+                0, 2, TimeUnit.SECONDS);
         syncLoops.put(gameId, sLoop);
     }
 
@@ -210,6 +209,9 @@ public class GameService {
         // Mover en Redis y obtener comida si la hay
         Optional<Food> eatenFood = boardService.movePlayer(game.getBoardId(), player, newX, newY);
 
+        player.setPositionX(newX);
+        player.setPositionY(newY);
+
         // Si comió, aumentar salud
         eatenFood.ifPresent(food -> {
             player.setHealth(player.getHealth() + food.getNutritionValue());
@@ -219,7 +221,7 @@ public class GameService {
             foodEvent.put("id", food.getId());
             foodEvent.put("x", food.getPositionX());
             foodEvent.put("y", food.getPositionY());
-            template.convertAndSend(TOPIC + gameId + "/food", foodEvent);
+            publishEncryptedEvent(gameId, "food", foodEvent);
         });
 
         PlayerPositionDTO dto = new PlayerPositionDTO(
@@ -228,9 +230,9 @@ public class GameService {
                 player.getPositionX(),
                 player.getPositionY(),
                 player.getHealth(),
-                player.isAlive()
-        );
-        template.convertAndSend(TOPIC + gameId + PLAYERS, dto);
+                player.isAlive());
+
+        publishEncryptedEvent(gameId, "players", dto);
 
         return player;
     }
@@ -257,7 +259,8 @@ public class GameService {
                         player.getHealth(),
                         player.isAlive());
 
-                template.convertAndSend(TOPIC + gameId + PLAYERS, dto);
+                publishEncryptedEvent(gameId, "players", dto); 
+
             }
         }
 
@@ -290,7 +293,7 @@ public class GameService {
         payload.put(OWNER, null);
         payload.put(TIMESTAMP, Instant.now().toString());
 
-        template.convertAndSend(TOPIC + gameId + POWER, payload);
+        publishEncryptedEvent(gameId, "power", payload);
     }
 
     public synchronized void claimPower(String gameId, String playerId) {
@@ -306,7 +309,8 @@ public class GameService {
         payload.put(OWNER, playerId);
         payload.put(TIMESTAMP, Instant.now().toString());
 
-        template.convertAndSend(TOPIC + gameId + POWER, payload);
+        publishEncryptedEvent(gameId, "power", payload);
+
     }
 
     public void usePower(String gameId, String playerId) {
@@ -335,7 +339,7 @@ public class GameService {
         payload.put(OWNER, playerId);
         payload.put(TIMESTAMP, Instant.now().toString());
 
-        template.convertAndSend(TOPIC + gameId + POWER, payload);
+        publishEncryptedEvent(gameId, "power", payload);
     }
 
     public Game createGame(Game game, int totalFood) {
@@ -357,7 +361,8 @@ public class GameService {
 
     public void openConnectionWindow(String gameId) {
         long CONNECTION_WINDOW_SECONDS = 30;
-        ScheduledFuture<?> timer = scheduler.schedule(() -> handleConnectionWindowEnd(gameId), CONNECTION_WINDOW_SECONDS, TimeUnit.SECONDS);
+        ScheduledFuture<?> timer = scheduler.schedule(() -> handleConnectionWindowEnd(gameId),
+                CONNECTION_WINDOW_SECONDS, TimeUnit.SECONDS);
 
         connectionWindows.put(gameId, timer);
     }
@@ -378,30 +383,44 @@ public class GameService {
         connectionWindows.remove(gameId);
     }
 
+    // CORREGIDO: seedFood ahora trabaja directamente con BoardService
     private void seedFood(String boardId, int width, int height, int totalFood) {
-        if (width <= 2 || height <= 2 || totalFood <= 0) {
+        if (width <= 2 || height <= 2 || totalFood <= 0)
             return;
-        }
 
         Random random = new Random();
         int placed = 0;
         int maxAttempts = totalFood * 5;
         int attempts = 0;
 
-        Board board = boardService.getBoard(boardId)
-                .orElseThrow(() -> new DinoChompException("Board not found: " + boardId));
+        // Obtener el board actual para verificar posiciones ocupadas
+        Optional<Board> boardOpt = boardService.getBoard(boardId);
+        if (boardOpt.isEmpty()) {
+            throw new RuntimeException("Board not found: " + boardId);
+        }
+        Board board = boardOpt.get();
 
         while (placed < totalFood && attempts < maxAttempts) {
             attempts++;
 
             int x = random.nextInt(width);
             int y = random.nextInt(height);
+
+            // Evitar esquinas
+            boolean isCorner = (x == 0 && y == 0)
+                    || (x == 0 && y == height - 1)
+                    || (x == width - 1 && y == 0)
+                    || (x == width - 1 && y == height - 1);
+            if (isCorner)
+                continue;
+
             Point p = new Point(x, y);
 
-            if (isCorner(x, y, width, height) || !isFree(board, p)) {
+            // Verificar si está ocupado
+            if (!board.isNull(p))
                 continue;
-            }
 
+            // Crear Food
             Food f = Food.builder()
                     .name("pollo")
                     .positionX(x)
@@ -409,7 +428,10 @@ public class GameService {
                     .nutritionValue(10)
                     .build();
 
+            // Agregar usando BoardService (guarda en Redis y DB)
             boardService.addFood(boardId, f);
+
+            // Actualizar el board local para las próximas iteraciones
             board.getMap().put(p, f);
 
             placed++;
@@ -578,7 +600,8 @@ public class GameService {
 
         for (Player mem : players.values()) {
             Player db = playerRepository.findById(mem.getId()).orElse(null);
-            if (db == null) continue;
+            if (db == null)
+                continue;
 
             db.setPositionX(mem.getPositionX());
             db.setPositionY(mem.getPositionY());
@@ -599,14 +622,8 @@ public class GameService {
         log.info("Juego finalizado: {}", message);
         String winner = (game.getWinner() != null) ? game.getWinner().getName() : "Ninguno";
 
-        template.convertAndSend(
-                TOPIC + gameId + "/events",
-                Map.of(
-                        "event", "GAME_ENDED",
-                        "winner", winner
-                )
-        );
-
+        Map<String, Object> payload = Map.of("event", "GAME_ENDED", "winner", winner);
+        publishEncryptedEvent(gameId, "events", payload);
         stopGameLoop(gameId);
 
         activePlayers.remove(gameId);
@@ -615,4 +632,18 @@ public class GameService {
 
         log.info("Partida {} finalizada correctamente", gameId);
     }
+
+    private void publishEncryptedEvent(String gameId, String topic, Object payload) {
+        try {
+            String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(payload);
+            AesCrypto.Encrypted encrypted = AesCrypto.encrypt(json);
+            Map<String, String> encryptedPayload = Map.of(
+                    "iv", encrypted.iv(),
+                    "ciphertext", encrypted.ciphertext());
+            redisPubSubService.publishGameEvent(gameId, topic, encryptedPayload);
+        } catch (Exception e) {
+            log.error("❌ Error cifrando payload para topic {} en juego {}", topic, gameId, e);
+        }
+    }
+
 }

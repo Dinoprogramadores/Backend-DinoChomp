@@ -3,6 +3,7 @@ package edu.escuelaing.dinochomp_backend.controllers;
 import edu.escuelaing.dinochomp_backend.model.game.Player;
 import edu.escuelaing.dinochomp_backend.services.AesCrypto;
 import edu.escuelaing.dinochomp_backend.services.GameService;
+import edu.escuelaing.dinochomp_backend.services.RedisPubSubService;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerMoveMessage;
 import edu.escuelaing.dinochomp_backend.utils.dto.player.PlayerPositionDTO;
 import edu.escuelaing.dinochomp_backend.utils.dto.power.PowerActivationtDTO;
@@ -14,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,119 +27,133 @@ public class GameWebSocketController {
     private GameService gameService;
 
     @Autowired
-    private SimpMessagingTemplate template;
+    private RedisPubSubService redisPubSubService;
 
-    private static final String TOPIC = "/topic/games/";
     private final ObjectMapper mapper = new ObjectMapper();
 
     @MessageMapping("/games/{gameId}/start")
-    public void startGame(@DestinationVariable String gameId) {
+    public void startGame(@DestinationVariable String gameId,
+            @Payload Map<String, String> encrypted) {
         gameService.startGameLoop(gameId);
-        template.convertAndSend(TOPIC + gameId + "/status", encryptResponse("Game started!"));
+        publishEncryptedEvent(gameId, "status", "Game started!");
     }
 
     @MessageMapping("/games/{gameId}/stop")
-    public void stopGame(@DestinationVariable String gameId) {
+    public void stopGame(@DestinationVariable String gameId,
+            @Payload Map<String, String> encrypted) {
         gameService.stopGameLoop(gameId);
-         template.convertAndSend(TOPIC + gameId + "/status", encryptResponse("Game stopped!"));
+        publishEncryptedEvent(gameId, "status", "Game stopped!");
     }
 
     @MessageMapping("/games/{gameId}/power/claim")
-    public void claimPower(@DestinationVariable String gameId, @Payload Map<String, String> encrypted) {
+    public void claimPower(@DestinationVariable String gameId,
+            @Payload Map<String, String> encrypted) {
 
-        Map<String, Object> data = decryptPayload(encrypted);
+        try {
+            String json = AesCrypto.decrypt(encrypted.get("iv"), encrypted.get("ciphertext"));
+            PowerActivationtDTO msg = mapper.readValue(json, PowerActivationtDTO.class);
 
-        String gId = data.get("gameId").toString();
-        String pId = data.get("playerId").toString();
+            gameService.claimPower(msg.getGameId(), msg.getPlayerId());
 
-        gameService.claimPower(gId, pId);
+        } catch (Exception e) {
+            log.error("Error descifrando claimPower", e);
+        }
     }
 
     @MessageMapping("/games/{gameId}/power/use")
-    public void usePower(@DestinationVariable String gameId, @Payload Map<String, String> encrypted) {
+    public void usePower(@DestinationVariable String gameId,
+            @Payload Map<String, String> encrypted) {
+        try {
+            String json = AesCrypto.decrypt(encrypted.get("iv"), encrypted.get("ciphertext"));
+            PowerActivationtDTO msg = mapper.readValue(json, PowerActivationtDTO.class);
 
-        Map<String, Object> data = decryptPayload(encrypted);
-
-        String pId = data.get("playerId").toString();
-        gameService.usePower(gameId, pId);
+            gameService.usePower(gameId, msg.getPlayerId());
+        } catch (Exception e) {
+            log.error("Error descifrando usePower", e);
+        }
     }
 
-     @MessageMapping("/games/{gameId}/move")
-    public void handleMove(@DestinationVariable String gameId, @Payload Map<String, String> encrypted) {
+    @MessageMapping("/games/{gameId}/move")
+    public void handleMove(@DestinationVariable String gameId,
+            @Payload Map<String, String> encrypted) {
 
-        Map<String, Object> data = decryptPayload(encrypted);
+        try {
+            // Descifrar JSON
+            String json = AesCrypto.decrypt(encrypted.get("iv"), encrypted.get("ciphertext"));
+            PlayerMoveMessage msg = mapper.readValue(json, PlayerMoveMessage.class);
 
-        String playerId = data.get("playerId").toString();
-        String direction = data.get("direction").toString();
+            if (msg == null || msg.getPlayerId() == null || msg.getDirection() == null) {
+                return;
+            }
 
-        Player updated = gameService.movePlayer(gameId, playerId, direction);
-        if (updated == null) return;
+            // Procesar el movimiento
+            Player updated = gameService.movePlayer(gameId, msg.getPlayerId(), msg.getDirection());
+            if (updated == null) {
+                log.info("Movimiento inválido o jugador no encontrado");
+                return;
+            }
 
-        PlayerPositionDTO dto = PlayerPositionDTO.builder()
-                .id(updated.getId())
-                .name(updated.getName())
-                .positionX(updated.getPositionX())
-                .positionY(updated.getPositionY())
-                .health(updated.getHealth())
-                .isAlive(updated.isAlive())
-                .build();
+            // Construir DTO
+            PlayerPositionDTO dto = PlayerPositionDTO.builder()
+                    .id(updated.getId())
+                    .name(updated.getName())
+                    .positionX(updated.getPositionX())
+                    .positionY(updated.getPositionY())
+                    .health(updated.getHealth())
+                    .isAlive(updated.isAlive())
+                    .build();
 
-        template.convertAndSend(
-                TOPIC + gameId + "/players",
-                encryptResponse(dto)     // 🔐 envío cifrado
-        );
+            // Publicar posición cifrada
+            publishEncryptedEvent(gameId, "players", dto);
+
+        } catch (Exception e) {
+            log.error("Error procesando movimiento cifrado", e);
+        }
     }
 
     @MessageMapping("/games/{gameId}/join")
-    public void joinGame(@DestinationVariable String gameId, @Payload Map<String, String> encrypted) {
+    public void joinGame(@DestinationVariable String gameId,
+            @Payload Map<String, String> encrypted) {
 
-        Map<String, Object> data = decryptPayload(encrypted);
-
-        Player player = new Player();
-        player.setId(data.get("id").toString());
-        player.setName(data.get("name").toString());
-        player.setEmail(data.get("email").toString());
-        player.setPositionX((int) data.get("positionX"));
-        player.setPositionY((int) data.get("positionY"));
-        player.setAlive((boolean) data.get("alive"));
-        player.setHealth((int) data.get("health"));
-
-        gameService.registerPlayer(gameId, player);
-    }
-
-    // -------------------------------------------------------
-    // 🔓 UTILERÍA PARA DESCIFRAR MENSAJE ENTRANTE
-    // -------------------------------------------------------
-    private Map<String, Object> decryptPayload(Map<String, String> encrypted) {
         try {
-            String json = AesCrypto.decrypt(
-                    encrypted.get("iv"),
-                    encrypted.get("ciphertext")
-            );
-            return mapper.readValue(json, Map.class);
+            String json = AesCrypto.decrypt(encrypted.get("iv"), encrypted.get("ciphertext"));
+            Player player = mapper.readValue(json, Player.class);
+
+            if (player == null || player.getId() == null) {
+                log.info("Jugador inválido en join");
+                return;
+            }
+
+            gameService.registerPlayer(gameId, player);
+
+            // Notificar a otros jugadores (cifrado)
+            publishEncryptedEvent(gameId, "player-joined", player);
+
         } catch (Exception e) {
-            log.error("❌ Error descifrando payload", e);
-            throw new RuntimeException("Invalid encrypted payload");
+            log.error("Error descifrando join", e);
         }
     }
 
-    // -------------------------------------------------------
-    // 🔐 UTILERÍA PARA CIFRAR RESPUESTAS AL FRONTEND
-    // -------------------------------------------------------
-    private Map<String, String> encryptResponse(Object data) {
+    private void publishEncryptedEvent(String gameId, String channel, Object data) {
         try {
+            // 1. Serializar data a JSON
             String json = mapper.writeValueAsString(data);
-            AesCrypto.Encrypted enc = AesCrypto.encrypt(json);
-
-            return Map.of(
-                    "iv", enc.iv(),
-                    "ciphertext", enc.ciphertext()
+            
+            // 2. Cifrar el JSON
+            AesCrypto.Encrypted encrypted = AesCrypto.encrypt(json);
+            
+            // 3. ✅ Crear Map con iv y ciphertext (NO enviar el objeto Encrypted directamente)
+            Map<String, String> payload = Map.of(
+                "iv", encrypted.iv(),
+                "ciphertext", encrypted.ciphertext()
             );
+            
+            // 4. Publicar el Map
+            redisPubSubService.publishGameEvent(gameId, channel, payload);
+            
         } catch (Exception e) {
-            log.error("❌ Error cifrando respuesta", e);
-            throw new RuntimeException("Encryption error");
+            log.error("Error cifrando evento {}", channel, e);
         }
     }
 
-    
 }
